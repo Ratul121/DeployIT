@@ -1,0 +1,245 @@
+<!-- Dashboard Content -->
+<div class="px-4 sm:px-6 lg:px-8">
+        <!-- Welcome Section -->
+        <div class="glass-effect rounded-2xl p-8 mb-8 border border-white/30">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-4xl font-bold gradient-text mb-2">
+                        Welcome back, <%= user.displayName %>! 👋
+                    </h1>
+                    <p class="text-lg text-gray-600">
+                        Manage your deployed applications and monitor their performance.
+                    </p>
+                </div>
+                <div class="hidden md:block">
+                    <div class="w-20 h-20 gradient-bg rounded-2xl flex items-center justify-center">
+                        <i class="fas fa-rocket text-white text-3xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Section -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="glass-effect rounded-xl p-6 border border-white/30 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 mb-1">Total Apps</p>
+                        <p class="text-3xl font-bold text-gray-900"><%= stats.totalApps %></p>
+                    </div>
+                    <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-cube text-blue-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-effect rounded-xl p-6 border border-white/30 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 mb-1">Running Apps</p>
+                        <p class="text-3xl font-bold text-green-600"><%= stats.runningApps %></p>
+                    </div>
+                    <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-play-circle text-green-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-effect rounded-xl p-6 border border-white/30 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 mb-1">Total Deployments</p>
+                        <p class="text-3xl font-bold text-purple-600"><%= stats.totalDeployments %></p>
+                    </div>
+                    <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-rocket text-purple-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-effect rounded-xl p-6 border border-white/30 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 mb-1">Failed Deployments</p>
+                        <p class="text-3xl font-bold text-red-600"><%= stats.failedDeployments %></p>
+                    </div>
+                    <div class="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Apps Section -->
+        <div class="glass-effect rounded-2xl border border-white/30 mb-8">
+            <div class="px-8 py-6 border-b border-gray-200/50">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="text-2xl font-bold text-gray-900">Your Applications</h3>
+                        <p class="mt-2 text-gray-600">
+                            Manage and monitor your deployed applications
+                        </p>
+                    </div>
+                    <a href="/apps/new" class="btn-primary text-white px-6 py-3 rounded-xl text-sm font-semibold flex items-center">
+                        <i class="fas fa-rocket mr-2"></i>
+                        Deploy New App
+                    </a>
+                </div>
+            </div>
+            
+            <% if (apps.length === 0) { %>
+                <div class="px-8 py-16 text-center">
+                    <div class="w-24 h-24 bg-gradient-to-br from-blue-100 to-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                        <i class="fas fa-rocket text-3xl gradient-text"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-3">Ready to deploy?</h3>
+                    <p class="text-gray-600 mb-8 max-w-md mx-auto">
+                        Connect your GitHub repository and deploy your first application with just a few clicks.
+                    </p>
+                    <a href="/apps/new" class="btn-primary text-white px-8 py-4 rounded-xl text-base font-semibold inline-flex items-center">
+                        <i class="fas fa-rocket mr-3"></i>
+                        Deploy Your First App
+                    </a>
+                </div>
+            <% } else { %>
+                <div class="p-6 space-y-4">
+                    <% apps.forEach(app => { %>
+                        <div class="bg-white/60 backdrop-blur-sm rounded-xl p-6 border border-white/50 card-hover">
+                            <a href="/apps/<%= app._id %>" class="block">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-4">
+                                        <div class="flex-shrink-0">
+                                            <div class="w-12 h-12 app-icon rounded-xl">
+                                                <%= app.name.charAt(0).toUpperCase() %>
+                                            </div>
+                                        </div>
+                                        <div class="min-w-0 flex-1">
+                                            <div class="flex items-center space-x-3 mb-2">
+                                                <h4 class="text-lg font-semibold text-gray-900 truncate"><%= app.name %></h4>
+                                                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium
+                                                    <% if (app.deployment.status === 'running') { %>
+                                                        bg-green-100 text-green-800 border border-green-200
+                                                    <% } else if (app.deployment.status === 'failed') { %>
+                                                        bg-red-100 text-red-800 border border-red-200
+                                                    <% } else if (app.deployment.status === 'building') { %>
+                                                        bg-yellow-100 text-yellow-800 border border-yellow-200
+                                                    <% } else { %>
+                                                        bg-gray-100 text-gray-800 border border-gray-200
+                                                    <% } %>
+                                                ">
+                                                    <% if (app.deployment.status === 'running') { %>
+                                                        <div class="w-2 h-2 bg-green-500 rounded-full mr-2 status-dot"></div>
+                                                    <% } %>
+                                                    <%= app.deployment.status %>
+                                                </span>
+                                            </div>
+                                            <div class="flex items-center space-x-4 text-sm text-gray-600">
+                                                <span class="flex items-center">
+                                                    <i class="fab fa-github mr-2"></i>
+                                                    <%= app.repository.fullName %>
+                                                </span>
+                                                <span class="flex items-center">
+                                                    <i class="fas fa-clock mr-2"></i>
+                                                    <%= app.createdAt.toLocaleDateString() %>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-3">
+                                        <% if (app.url) { %>
+                                            <a href="<%= app.url %>" target="_blank" class="text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50 transition-colors" onclick="event.stopPropagation()">
+                                                <i class="fas fa-external-link-alt"></i>
+                                            </a>
+                                        <% } %>
+                                        <div class="text-gray-400">
+                                            <i class="fas fa-chevron-right"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                    <% }); %>
+                </div>
+            <% } %>
+        </div>
+
+        <!-- Recent Deployments Section -->
+        <div class="glass-effect rounded-2xl border border-white/30">
+            <div class="px-8 py-6 border-b border-gray-200/50">
+                <h3 class="text-2xl font-bold text-gray-900">Recent Deployments</h3>
+                <p class="mt-2 text-gray-600">
+                    Latest deployment activity across all your applications
+                </p>
+            </div>
+            
+            <% if (recentDeployments.length === 0) { %>
+                <div class="px-8 py-12 text-center">
+                    <div class="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-rocket text-gray-400 text-2xl"></i>
+                    </div>
+                    <p class="text-gray-500">No deployments yet</p>
+                </div>
+            <% } else { %>
+                <div class="p-6 space-y-3">
+                    <% recentDeployments.forEach(deployment => { %>
+                        <div class="bg-white/60 backdrop-blur-sm rounded-lg p-4 border border-white/50">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-4">
+                                    <div class="flex-shrink-0">
+                                        <div class="w-10 h-10 rounded-xl flex items-center justify-center
+                                            <% if (deployment.status === 'success') { %>
+                                                bg-green-100 text-green-600
+                                            <% } else if (deployment.status === 'failed') { %>
+                                                bg-red-100 text-red-600
+                                            <% } else { %>
+                                                bg-yellow-100 text-yellow-600
+                                            <% } %>
+                                        ">
+                                            <i class="fas fa-
+                                                <% if (deployment.status === 'success') { %>
+                                                    check
+                                                <% } else if (deployment.status === 'failed') { %>
+                                                    times
+                                                <% } else { %>
+                                                    clock
+                                                <% } %>
+                                            "></i>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p class="font-medium text-gray-900">
+                                            <%= deployment.appId ? deployment.appId.name : 'Unknown App' %>
+                                        </p>
+                                        <p class="text-sm text-gray-600">
+                                            Deployment <%= deployment.status %>
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    <%= deployment.createdAt.toLocaleString() %>
+                                </div>
+                            </div>
+                        </div>
+                    <% }); %>
+                </div>
+            <% } %>
+        </div>
+    </div>
+
+    <!-- Socket.io Script -->
+    <script>
+        const socket = io();
+        socket.emit('authenticate', { userId: '<%= user._id %>' });
+
+        // Listen for app status updates
+        socket.on('app_status', (data) => {
+            // Update app status in real-time
+            location.reload(); // Simple reload for now
+        });
+
+        // Listen for deployment updates
+        socket.on('deployment_status', (data) => {
+            // Update deployment status in real-time
+            location.reload(); // Simple reload for now
+        });
+    </script> 

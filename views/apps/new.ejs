@@ -1,0 +1,634 @@
+<!-- New App Page Content -->
+<style>
+    .gradient-bg {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .form-input {
+        transition: all 0.3s ease;
+        border: 2px solid #d1d5db;
+        background-color: #ffffff;
+    }
+    .form-input:focus {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        border-color: #3b82f6;
+    }
+    .form-input:hover {
+        border-color: #9ca3af;
+    }
+    .form-section {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e5e7eb;
+        transition: all 0.3s ease;
+    }
+    .form-section:hover {
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    }
+    .input-group {
+        position: relative;
+    }
+    .input-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6b7280;
+        z-index: 10;
+    }
+    .input-with-icon {
+        padding-left: 40px;
+    }
+    
+    /* Notification improvements */
+    #notifications {
+        max-height: calc(100vh - 2rem);
+        overflow-y: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    #notifications::-webkit-scrollbar {
+        display: none;
+    }
+    
+    /* Notification styling */
+    .notification-item {
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .notification-enter {
+        animation: slideInRight 0.3s ease-out;
+    }
+    
+    .notification-exit {
+        animation: slideOutRight 0.3s ease-in;
+    }
+    
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+</style>
+
+<!-- Header Section -->
+<div class="gradient-bg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div class="text-center">
+            <h1 class="text-4xl font-bold text-white mb-4">
+                <i class="fas fa-rocket mr-3"></i>
+                Create New Application
+            </h1>
+            <p class="text-xl text-blue-100 max-w-2xl mx-auto">
+                Deploy your GitHub repository with ease. Configure your app settings and launch it in minutes.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 pb-12">
+        <form id="createAppForm" class="space-y-8">
+            <!-- Repository Selection -->
+            <div class="form-section p-8">
+                <div class="flex items-center mb-6">
+                    <div class="bg-blue-100 p-3 rounded-full mr-4">
+                        <i class="fab fa-github text-blue-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-semibold text-gray-900">Repository Selection</h3>
+                        <p class="text-gray-600">Choose the GitHub repository you want to deploy</p>
+                    </div>
+                </div>
+                
+                <!-- Repository Search -->
+                <div class="input-group mb-4">
+                    <label for="repoSearch" class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-search mr-2 text-gray-500"></i>
+                        Search Repositories
+                    </label>
+                    <input type="text" id="repoSearch" class="form-input block w-full h-12 text-base rounded-xl focus:ring-2 focus:ring-blue-500 shadow-sm px-4" placeholder="Search by name, description, or language...">
+                </div>
+
+                <!-- Repository Type Filter -->
+                <div class="input-group mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-filter mr-2 text-gray-500"></i>
+                        Repository Type
+                    </label>
+                    <div class="flex space-x-4">
+                        <label class="flex items-center">
+                            <input type="radio" name="repoType" value="all" class="mr-2 text-blue-600" checked>
+                            <span class="text-sm text-gray-700">All Repositories</span>
+                            <span id="allCount" class="ml-2 text-xs bg-gray-100 px-2 py-1 rounded-full text-gray-600"></span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="repoType" value="public" class="mr-2 text-blue-600">
+                            <span class="text-sm text-gray-700">Public</span>
+                            <span id="publicCount" class="ml-2 text-xs bg-green-100 px-2 py-1 rounded-full text-green-600"></span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="repoType" value="private" class="mr-2 text-blue-600">
+                            <span class="text-sm text-gray-700">Private</span>
+                            <span id="privateCount" class="ml-2 text-xs bg-blue-100 px-2 py-1 rounded-full text-blue-600"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Repository Selection -->
+                <div class="input-group">
+                    <div class="input-icon">
+                        <i class="fas fa-code-branch"></i>
+                    </div>
+                    <select id="repository" name="repositoryId" class="form-input input-with-icon block w-full h-14 text-base rounded-xl focus:ring-2 focus:ring-blue-500 shadow-sm" required>
+                        <option value="">Loading repositories...</option>
+                    </select>
+                </div>
+                
+                <!-- Repository Info -->
+                <div id="repoInfo" class="mt-3 p-3 bg-gray-50 rounded-lg border hidden">
+                    <div class="text-sm text-gray-600">
+                        <span id="repoInfoText">Select a repository to see details</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- App Configuration -->
+            <div class="form-section p-8">
+                <div class="flex items-center mb-6">
+                    <div class="bg-green-100 p-3 rounded-full mr-4">
+                        <i class="fas fa-cog text-green-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-semibold text-gray-900">App Configuration</h3>
+                        <p class="text-gray-600">Configure your application settings</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- App Name -->
+                    <div class="input-group">
+                        <label for="name" class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="fas fa-tag mr-2 text-gray-500"></i>
+                            Application Name
+                        </label>
+                        <input type="text" name="name" id="name" class="form-input block w-full h-14 text-base rounded-xl focus:ring-2 focus:ring-blue-500 shadow-sm px-4" placeholder="my-awesome-app" required>
+                        <p class="mt-2 text-sm text-gray-500">A unique name for your application</p>
+                    </div>
+
+                    <!-- Startup Command -->
+                    <div class="input-group">
+                        <label for="startupCommand" class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="fas fa-play mr-2 text-gray-500"></i>
+                            Startup Command
+                        </label>
+                        <input type="text" name="startupCommand" id="startupCommand" class="form-input block w-full h-14 text-base rounded-xl focus:ring-2 focus:ring-blue-500 shadow-sm px-4" value="npm start" required>
+                        <p class="mt-2 text-sm text-gray-500">Command to start your application</p>
+                    </div>
+                </div>
+
+                <!-- Build Command -->
+                <div class="input-group mt-6">
+                    <label for="buildCommand" class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-hammer mr-2 text-gray-500"></i>
+                        Build Command
+                    </label>
+                    <input type="text" name="buildCommand" id="buildCommand" class="form-input block w-full h-14 text-base rounded-xl focus:ring-2 focus:ring-blue-500 shadow-sm px-4" value="npm install">
+                    <p class="mt-2 text-sm text-gray-500">Command to build/install dependencies</p>
+                </div>
+            </div>
+
+            <!-- Environment Variables -->
+            <div class="form-section p-8">
+                <div class="flex items-center mb-6">
+                    <div class="bg-purple-100 p-3 rounded-full mr-4">
+                        <i class="fas fa-key text-purple-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-semibold text-gray-900">Environment Variables</h3>
+                        <p class="text-gray-600">Configure environment variables for your application</p>
+                    </div>
+                </div>
+                
+                <div class="input-group">
+                    <label for="environmentVariables" class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-file-code mr-2 text-gray-500"></i>
+                        Environment Variables (.env format)
+                    </label>
+                    <textarea name="environmentVariables" id="environmentVariables" rows="8" class="form-input block w-full text-base rounded-xl focus:ring-2 focus:ring-blue-500 shadow-sm px-4 py-4 font-mono" placeholder="NODE_ENV=production
+API_URL=https://api.example.com
+DATABASE_URL=mongodb://localhost:27017/myapp
+JWT_SECRET=your-secret-key"></textarea>
+                    
+                    <!-- Warning about PORT -->
+                    <div class="mt-3 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <div class="flex items-start">
+                            <i class="fas fa-exclamation-triangle text-yellow-600 mt-1 mr-2"></i>
+                            <div class="text-sm text-yellow-800">
+                                <p class="font-medium mb-1">⚠️ Do NOT add PORT in here</p>
+                                <p>The PORT is automatically assigned by the system (range: 4000-5000). Adding PORT here will be ignored.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div class="flex items-start">
+                            <i class="fas fa-info-circle text-blue-600 mt-1 mr-2"></i>
+                            <div class="text-sm text-blue-800">
+                                <p class="font-medium mb-1">Environment Variables Format:</p>
+                                <p>Enter each variable on a new line in the format: <code class="bg-blue-100 px-1 rounded">KEY=value</code></p>
+                                <p class="mt-1">Example: <code class="bg-blue-100 px-1 rounded">NODE_ENV=production</code></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="form-section p-8">
+                <div class="flex flex-col sm:flex-row gap-4 justify-end">
+                    <button type="button" id="cancelBtn" class="px-8 py-4 border-2 border-gray-300 rounded-xl text-base font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all">
+                        <i class="fas fa-times mr-2"></i>
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl text-base font-semibold shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all transform hover:scale-105">
+                        <i class="fas fa-rocket mr-2"></i>
+                        Create Application
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Loading Modal -->
+    <div id="loadingModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
+            <div class="flex items-center justify-center">
+                <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mr-4"></div>
+                <div>
+                    <h3 class="text-xl font-semibold text-gray-900">Creating Application</h3>
+                    <p class="text-gray-600 mt-1">Please wait while we set up your app...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notifications" class="fixed top-4 right-4 z-[9999] pointer-events-none w-80"></div>
+
+    <script>
+        // Repository data and state
+        let allRepositories = [];
+        let currentSearch = '';
+        let currentType = 'all';
+        let searchTimeout;
+
+        // Load repositories with search and filter
+        async function loadRepositories(search = '', type = 'all') {
+            try {
+                const params = new URLSearchParams({
+                    per_page: 100,
+                    search: search,
+                    type: type
+                });
+                
+                const response = await fetch(`/repos?${params}`);
+                const data = await response.json();
+                
+                if (data.repositories) {
+                    allRepositories = data.repositories;
+                    updateRepositorySelect(data.repositories);
+                    updateRepositoryCounts(data.filters);
+                } else {
+                    throw new Error('Invalid response format');
+                }
+            } catch (error) {
+                console.error('Error loading repositories:', error);
+                showNotification('Failed to load repositories', 'error');
+            }
+        }
+
+        // Update repository select dropdown
+        function updateRepositorySelect(repositories) {
+            const select = document.getElementById('repository');
+            select.innerHTML = '<option value="">Select a repository</option>';
+            
+            repositories.forEach(repo => {
+                const option = document.createElement('option');
+                option.value = repo.id;
+                
+                // Create display text with privacy indicator
+                const privacyIcon = repo.private ? '🔒' : '🌐';
+                const languageText = repo.language ? ` (${repo.language})` : '';
+                option.textContent = `${privacyIcon} ${repo.name}${languageText}`;
+                
+                // Store repository data
+                option.dataset.fullName = repo.fullName;
+                option.dataset.description = repo.description || '';
+                option.dataset.language = repo.language || '';
+                option.dataset.cloneUrl = repo.cloneUrl;
+                option.dataset.private = repo.private;
+                option.dataset.updatedAt = repo.updatedAt;
+                
+                select.appendChild(option);
+            });
+        }
+
+        // Update repository counts
+        function updateRepositoryCounts(filters) {
+            if (filters) {
+                document.getElementById('allCount').textContent = filters.totalPublic + filters.totalPrivate;
+                document.getElementById('publicCount').textContent = filters.totalPublic;
+                document.getElementById('privateCount').textContent = filters.totalPrivate;
+            }
+        }
+
+        // Handle search input
+        function handleSearch() {
+            const searchInput = document.getElementById('repoSearch');
+            const typeRadios = document.querySelectorAll('input[name="repoType"]');
+            
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    currentSearch = e.target.value;
+                    loadRepositories(currentSearch, currentType);
+                }, 300); // Debounce search
+            });
+
+            typeRadios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    currentType = e.target.value;
+                    loadRepositories(currentSearch, currentType);
+                });
+            });
+        }
+
+        // Handle repository selection
+        function handleRepositorySelection() {
+            const select = document.getElementById('repository');
+            const repoInfo = document.getElementById('repoInfo');
+            const repoInfoText = document.getElementById('repoInfoText');
+            
+            select.addEventListener('change', (e) => {
+                const selectedOption = e.target.selectedOptions[0];
+                
+                if (selectedOption && selectedOption.value) {
+                    const isPrivate = selectedOption.dataset.private === 'true';
+                    const description = selectedOption.dataset.description;
+                    const language = selectedOption.dataset.language;
+                    const updatedAt = new Date(selectedOption.dataset.updatedAt).toLocaleDateString();
+                    
+                    // Auto-fill app name
+                    const repoName = selectedOption.dataset.fullName.split('/').pop();
+                    document.getElementById('name').value = repoName;
+                    
+                    let infoHTML = `
+                        <div class="flex items-center space-x-4">
+                            <div class="flex items-center">
+                                <span class="text-lg mr-2">${isPrivate ? '🔒' : '🌐'}</span>
+                                <span class="font-medium">${selectedOption.dataset.fullName}</span>
+                            </div>
+                            <div class="flex items-center text-sm text-gray-500">
+                                <span class="bg-gray-200 px-2 py-1 rounded-full">${isPrivate ? 'Private' : 'Public'}</span>
+                            </div>
+                        </div>
+                    `;
+                    
+                    if (description) {
+                        infoHTML += `<div class="mt-2 text-sm text-gray-600">${description}</div>`;
+                    }
+                    
+                    if (language) {
+                        infoHTML += `<div class="mt-2 text-xs text-gray-500">Language: ${language} • Updated: ${updatedAt}</div>`;
+                    }
+                    
+                    repoInfoText.innerHTML = infoHTML;
+                    repoInfo.classList.remove('hidden');
+                } else {
+                    repoInfo.classList.add('hidden');
+                    document.getElementById('name').value = '';
+                }
+            });
+        }
+
+        // Parse .env format to JSON
+        function parseEnvToJson(envString) {
+            if (!envString || !envString.trim()) {
+                return {};
+            }
+            
+            const result = {};
+            const lines = envString.split('\n');
+            
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                if (trimmedLine && !trimmedLine.startsWith('#')) {
+                    const equalIndex = trimmedLine.indexOf('=');
+                    if (equalIndex > 0) {
+                        const key = trimmedLine.substring(0, equalIndex).trim();
+                        const value = trimmedLine.substring(equalIndex + 1).trim();
+                        
+                        // Remove quotes if present
+                        const cleanValue = value.replace(/^["']|["']$/g, '');
+                        result[key] = cleanValue;
+                    }
+                }
+            }
+            
+            return result;
+        }
+
+        // Handle form submission
+        document.getElementById('createAppForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData.entries());
+            
+            // Convert .env format to JSON
+            if (data.environmentVariables) {
+                try {
+                    const envObject = parseEnvToJson(data.environmentVariables);
+                    data.environmentVariables = JSON.stringify(envObject);
+                } catch (error) {
+                    showNotification('Invalid environment variables format', 'error');
+                    return;
+                }
+            }
+            
+            console.log('Form data being sent:', data);
+            
+            // Validate required fields
+            if (!data.repositoryId) {
+                showNotification('Please select a repository', 'error');
+                return;
+            }
+            
+            if (!data.name) {
+                showNotification('Please enter an application name', 'error');
+                return;
+            }
+            
+            if (!data.startupCommand) {
+                showNotification('Please enter a startup command', 'error');
+                return;
+            }
+            
+            // Show loading modal
+            document.getElementById('loadingModal').classList.remove('hidden');
+            document.getElementById('loadingModal').classList.add('flex');
+            
+            try {
+                const response = await fetch('/apps', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showNotification('Application created successfully!', 'success');
+                    setTimeout(() => {
+                        window.location.href = `/apps/${result.app}`;
+                    }, 1500);
+                } else {
+                    console.error('Server response:', result);
+                    if (result.errors && Array.isArray(result.errors)) {
+                        const errorMessages = result.errors.map(err => err.msg).join(', ');
+                        throw new Error(errorMessages);
+                    } else {
+                        throw new Error(result.error || 'Failed to create application');
+                    }
+                }
+            } catch (error) {
+                console.error('Error creating app:', error);
+                showNotification(error.message, 'error');
+            } finally {
+                // Hide loading modal
+                document.getElementById('loadingModal').classList.add('hidden');
+                document.getElementById('loadingModal').classList.remove('flex');
+            }
+        });
+
+        // Enhanced notification system
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `transform transition-all duration-300 ease-in-out translate-x-full opacity-0 w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden border-l-4`;
+            
+            const typeColors = {
+                info: { bg: 'bg-blue-50', text: 'text-blue-800', border: 'border-blue-400', icon: 'info-circle' },
+                success: { bg: 'bg-green-50', text: 'text-green-800', border: 'border-green-400', icon: 'check-circle' },
+                warning: { bg: 'bg-yellow-50', text: 'text-yellow-800', border: 'border-yellow-400', icon: 'exclamation-triangle' },
+                error: { bg: 'bg-red-50', text: 'text-red-800', border: 'border-red-400', icon: 'exclamation-circle' }
+            };
+            
+            const colors = typeColors[type] || typeColors.info;
+            notification.classList.add(colors.border);
+            
+            notification.innerHTML = `
+                <div class="p-3 ${colors.bg}">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-${colors.icon} ${colors.text} text-base"></i>
+                        </div>
+                        <div class="ml-3 flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-900 break-words">${message}</p>
+                        </div>
+                        <div class="ml-2 flex-shrink-0">
+                            <button class="notification-close bg-transparent rounded-full inline-flex text-gray-400 hover:text-gray-600 focus:outline-none p-1 hover:bg-gray-200 transition-colors">
+                                <i class="fas fa-times text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Add to notifications container
+            const notificationsContainer = document.getElementById('notifications');
+            notificationsContainer.insertBefore(notification, notificationsContainer.firstChild);
+            
+            // Animate in
+            setTimeout(() => {
+                notification.classList.remove('translate-x-full', 'opacity-0');
+                notification.classList.add('translate-x-0', 'opacity-100');
+            }, 100);
+            
+            // Auto-hide after 5 seconds
+            const autoHideTimeout = setTimeout(() => {
+                hideNotification(notification);
+            }, 5000);
+            
+            // Store timeout reference for manual close
+            notification.dataset.timeoutId = autoHideTimeout;
+            
+            return notification;
+        }
+        
+        // Helper function to hide notification
+        function hideNotification(notification) {
+            if (notification && notification.parentElement) {
+                // Clear timeout if exists
+                if (notification.dataset.timeoutId) {
+                    clearTimeout(notification.dataset.timeoutId);
+                }
+                
+                notification.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(() => {
+                    if (notification.parentElement) {
+                        notification.parentElement.removeChild(notification);
+                    }
+                }, 300);
+            }
+        }
+
+        // Load repositories when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadRepositories();
+            handleSearch();
+            handleRepositorySelection();
+            
+            // Add event listeners
+            const cancelBtn = document.getElementById('cancelBtn');
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', function() {
+                    window.location.href = '/dashboard';
+                });
+            }
+            
+            // Notification close buttons (using event delegation)
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('.notification-close')) {
+                    const notification = e.target.closest('.w-full');
+                    if (notification) {
+                        hideNotification(notification);
+                    }
+                }
+            });
+        });
+    </script> 

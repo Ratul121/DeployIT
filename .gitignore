@@ -1,0 +1,5 @@
+/node_modules
+/deployments
+.env
+node_modules
+docs.txt

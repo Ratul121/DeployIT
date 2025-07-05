@@ -1,0 +1,8 @@
+{
+  "ignore": [
+    "deployments/",
+    "node_modules/",
+    "*.log"
+  ],
+  "ext": "js,json,ejs"
+} 

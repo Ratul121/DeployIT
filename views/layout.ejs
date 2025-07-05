@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= typeof title !== 'undefined' ? title + ' - ' : '' %>DeployIT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 6px -1px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(102, 126, 234, 0.4);
+        }
+        
+        .navbar-blur {
+            backdrop-filter: blur(20px);
+            background: rgba(255, 255, 255, 0.95);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .status-dot {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        .notification {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(10px);
+        }
+        .notification.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        .notification.hide {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        .log-container {
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        }
+        .log-entry {
+            padding: 8px 16px;
+            border-left: 4px solid transparent;
+            transition: all 0.2s ease;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .log-entry:hover {
+            background-color: rgba(102, 126, 234, 0.05);
+        }
+        .log-entry.info {
+            border-left-color: #3b82f6;
+            background-color: rgba(59, 130, 246, 0.05);
+        }
+        .log-entry.warn {
+            border-left-color: #f59e0b;
+            background-color: rgba(245, 158, 11, 0.05);
+        }
+        .log-entry.error {
+            border-left-color: #ef4444;
+            background-color: rgba(239, 68, 68, 0.05);
+        }
+        .log-entry.debug {
+            border-left-color: #6b7280;
+            background-color: rgba(107, 114, 128, 0.05);
+        }
+        
+        .app-icon {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+        
+        .sidebar-nav {
+            transition: all 0.3s ease;
+            border-radius: 0.75rem;
+        }
+        
+        .sidebar-nav:hover {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            transform: translateX(4px);
+        }
+        
+        .glass-effect {
+            backdrop-filter: blur(20px);
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="navbar-blur sticky top-0 z-50 border-b border-gray-200/20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="flex items-center group">
+                        <div class="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center mr-3 group-hover:scale-110 transition-transform duration-300">
+                            <i class="fas fa-rocket text-white text-lg"></i>
+                        </div>
+                        <span class="text-2xl font-bold gradient-text">DeployIT</span>
+                    </a>
+                </div>
+                
+                <div class="flex items-center space-x-6">
+                    <% if (typeof user !== 'undefined' && user) { %>
+                        <a href="/dashboard" class="sidebar-nav text-gray-700 hover:text-gray-900 px-4 py-2 text-sm font-medium flex items-center">
+                            <i class="fas fa-tachometer-alt mr-2"></i>
+                            Dashboard
+                        </a>
+                        <a href="/apps/new" class="btn-primary text-white px-6 py-2 rounded-xl text-sm font-medium flex items-center">
+                            <i class="fas fa-plus mr-2"></i>
+                            Deploy New App
+                        </a>
+                        <div class="flex items-center space-x-3 bg-white/50 backdrop-blur-sm rounded-xl px-4 py-2 border border-gray-200/50">
+                            <img src="<%= user.avatarUrl %>" alt="<%= user.displayName %>" class="w-8 h-8 rounded-full ring-2 ring-white shadow-sm">
+                            <span class="text-gray-700 text-sm font-medium"><%= user.displayName %></span>
+                        </div>
+                        <a href="/auth/logout" class="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+                            <i class="fas fa-sign-out-alt mr-1"></i>
+                            Logout
+                        </a>
+                    <% } else { %>
+                        <a href="/auth/github" class="btn-primary text-white px-6 py-3 rounded-xl text-sm font-medium flex items-center">
+                            <i class="fab fa-github mr-2"></i>
+                            Connect GitHub
+                        </a>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <%- body %>
+    </main>
+
+    <!-- Notification Container -->
+    <div id="notifications" class="fixed top-20 right-4 space-y-2 z-[9999]"></div>
+
+    <!-- Global Scripts -->
+    <script>
+        // Socket.io connection
+        const socket = io();
+        
+        // Authenticate socket if user is logged in
+        <% if (typeof user !== 'undefined' && user) { %>
+            socket.emit('authenticate', { userId: '<%= user._id %>' });
+        <% } %>
+
+        // Notification system
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification hide max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden`;
+            
+            const typeColors = {
+                info: 'bg-blue-50 text-blue-800',
+                success: 'bg-green-50 text-green-800',
+                warning: 'bg-yellow-50 text-yellow-800',
+                error: 'bg-red-50 text-red-800'
+            };
+            
+            notification.innerHTML = `
+                <div class="p-4">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'} ${typeColors[type]}"></i>
+                        </div>
+                        <div class="ml-3 w-0 flex-1 pt-0.5">
+                            <p class="text-sm font-medium text-gray-900">${message}</p>
+                        </div>
+                        <div class="ml-4 flex-shrink-0 flex">
+                            <button class="notification-close bg-white rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('notifications').appendChild(notification);
+            
+            // Show notification
+            setTimeout(() => {
+                notification.classList.remove('hide');
+                notification.classList.add('show');
+            }, 100);
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                notification.classList.remove('show');
+                notification.classList.add('hide');
+                setTimeout(() => {
+                    if (notification.parentElement) {
+                        notification.parentElement.removeChild(notification);
+                    }
+                }, 300);
+            }, 5000);
+        }
+
+        // Listen for socket notifications
+        socket.on('notification', (data) => {
+            showNotification(data.message, data.type || 'info');
+        });
+
+        // Global error handling
+        window.addEventListener('error', (e) => {
+            console.error('Global error:', e.error);
+        });
+
+        // Notification close buttons (using event delegation)
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.notification-close')) {
+                const notification = e.target.closest('.notification');
+                if (notification && notification.parentElement) {
+                    notification.classList.remove('show');
+                    notification.classList.add('hide');
+                    setTimeout(() => {
+                        if (notification.parentElement) {
+                            notification.parentElement.removeChild(notification);
+                        }
+                    }, 300);
+                }
+            }
+        });
+
+        // CSRF token for forms
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        
+        // Helper function for API calls
+        async function apiCall(url, options = {}) {
+            const defaultOptions = {
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(csrfToken && { 'X-CSRF-Token': csrfToken })
+                }
+            };
+            
+            const response = await fetch(url, {
+                ...defaultOptions,
+                ...options,
+                headers: {
+                    ...defaultOptions.headers,
+                    ...options.headers
+                }
+            });
+            
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ error: 'Network error' }));
+                throw new Error(error.error || 'Request failed');
+            }
+            
+            return response.json();
+        }
+    </script>
+</body>
+</html> 

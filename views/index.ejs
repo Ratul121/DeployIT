@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeployIT - Deploy GitHub Projects Effortlessly</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 6px -1px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(102, 126, 234, 0.4);
+        }
+        
+        .glass-effect {
+            backdrop-filter: blur(20px);
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .navbar-blur {
+            backdrop-filter: blur(20px);
+            background: rgba(255, 255, 255, 0.95);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="navbar-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="flex items-center group">
+                        <div class="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center mr-3 group-hover:scale-110 transition-transform duration-300">
+                            <i class="fas fa-rocket text-white text-lg"></i>
+                        </div>
+                        <span class="text-2xl font-bold gradient-text">DeployIT</span>
+                    </a>
+                </div>
+                
+                <div class="flex items-center">
+                    <% if (typeof user !== 'undefined' && user) { %>
+                        <a href="/dashboard" class="btn-primary text-white px-6 py-2 rounded-xl text-sm font-semibold flex items-center">
+                            <i class="fas fa-tachometer-alt mr-2"></i>
+                            Go to Dashboard
+                        </a>
+                    <% } else { %>
+                        <a href="/auth/github" class="btn-primary text-white px-6 py-2 rounded-xl text-sm font-semibold flex items-center">
+                            <i class="fab fa-github mr-2"></i>
+                            Connect GitHub
+                        </a>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div class="text-center">
+            <div class="flex justify-center mb-8">
+                <div class="w-24 h-24 rounded-2xl gradient-bg flex items-center justify-center">
+                    <i class="fas fa-rocket text-white text-4xl"></i>
+                </div>
+            </div>
+            
+            <h1 class="text-5xl md:text-7xl font-bold mb-6">
+                Deploy Your GitHub Projects
+                <span class="gradient-text block">Effortlessly</span>
+            </h1>
+            <p class="text-xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed">
+                Connect your GitHub account and deploy your repositories with lightning speed. 
+                Real-time monitoring, automated deployments, and seamless CI/CD integration.
+            </p>
+            
+            <div class="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
+                <% if (typeof user === 'undefined' || !user) { %>
+                    <a href="/auth/github" class="btn-primary text-white px-10 py-4 rounded-xl text-lg font-semibold inline-flex items-center">
+                        <i class="fab fa-github mr-3 text-xl"></i>
+                        Get Started with GitHub
+                    </a>
+                <% } else { %>
+                    <a href="/dashboard" class="btn-primary text-white px-10 py-4 rounded-xl text-lg font-semibold inline-flex items-center">
+                        <i class="fas fa-tachometer-alt mr-3"></i>
+                        Go to Dashboard
+                    </a>
+                <% } %>
+                
+                <div class="flex items-center text-gray-600">
+                    <i class="fas fa-shield-alt mr-2"></i>
+                    <span class="text-sm">Secure OAuth Authentication</span>
+                </div>
+            </div>
+            
+            <!-- Quick Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+                <div class="glass-effect rounded-xl p-6 card-hover">
+                    <div class="text-3xl font-bold gradient-text mb-2">⚡</div>
+                    <div class="text-lg font-semibold text-gray-900">Lightning Fast</div>
+                    <div class="text-gray-600 text-sm">Deploy in seconds</div>
+                </div>
+                <div class="glass-effect rounded-xl p-6 card-hover">
+                    <div class="text-3xl font-bold gradient-text mb-2">🔄</div>
+                    <div class="text-lg font-semibold text-gray-900">Auto-Deploy</div>
+                    <div class="text-gray-600 text-sm">CI/CD Integration</div>
+                </div>
+                <div class="glass-effect rounded-xl p-6 card-hover">
+                    <div class="text-3xl font-bold gradient-text mb-2">📊</div>
+                    <div class="text-lg font-semibold text-gray-900">Real-time Logs</div>
+                    <div class="text-gray-600 text-sm">Live monitoring</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Features Section -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div class="text-center mb-16">
+            <h2 class="text-4xl font-bold text-gray-900 mb-4">
+                Everything you need to <span class="gradient-text">deploy with confidence</span>
+            </h2>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                From GitHub integration to real-time monitoring, we've got your deployment pipeline covered.
+            </p>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div class="glass-effect p-8 rounded-2xl card-hover text-center">
+                <div class="w-16 h-16 gradient-bg rounded-2xl flex items-center justify-center mx-auto mb-6">
+                    <i class="fab fa-github text-white text-2xl"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-4">GitHub Integration</h3>
+                <p class="text-gray-600 leading-relaxed">
+                    Seamlessly connect your GitHub repositories with secure OAuth authentication. 
+                    Access both public and private repos with ease.
+                </p>
+            </div>
+            
+            <div class="glass-effect p-8 rounded-2xl card-hover text-center">
+                <div class="w-16 h-16 gradient-bg rounded-2xl flex items-center justify-center mx-auto mb-6">
+                    <i class="fas fa-rocket text-white text-2xl"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-4">One-Click Deployment</h3>
+                <p class="text-gray-600 leading-relaxed">
+                    Deploy your applications instantly with our streamlined process. 
+                    Watch your code come to life in real-time with live deployment logs.
+                </p>
+            </div>
+            
+            <div class="glass-effect p-8 rounded-2xl card-hover text-center">
+                <div class="w-16 h-16 gradient-bg rounded-2xl flex items-center justify-center mx-auto mb-6">
+                    <i class="fas fa-chart-line text-white text-2xl"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-4">Real-time Monitoring</h3>
+                <p class="text-gray-600 leading-relaxed">
+                    Monitor your applications with comprehensive logging, performance metrics, 
+                    and instant status updates for all your deployments.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- How It Works Section -->
+    <div class="bg-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold text-center text-gray-900 mb-12">How It Works</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div class="text-center">
+                    <div class="bg-blue-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                        <span class="text-blue-600 font-bold text-xl">1</span>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">Connect GitHub</h3>
+                    <p class="text-gray-600">Sign in with your GitHub account to access your repositories.</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="bg-blue-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                        <span class="text-blue-600 font-bold text-xl">2</span>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">Select Repository</h3>
+                    <p class="text-gray-600">Choose the repository you want to deploy from your GitHub account.</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="bg-blue-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                        <span class="text-blue-600 font-bold text-xl">3</span>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">Configure Settings</h3>
+                    <p class="text-gray-600">Set up your deployment configuration and environment variables.</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="bg-blue-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                        <span class="text-blue-600 font-bold text-xl">4</span>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">Deploy & Monitor</h3>
+                    <p class="text-gray-600">Deploy your application and monitor it with real-time logs.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="glass-effect mt-20 py-12 border-t border-white/20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center">
+                <div class="flex justify-center mb-6">
+                    <div class="w-12 h-12 rounded-xl gradient-bg flex items-center justify-center">
+                        <i class="fas fa-rocket text-white text-lg"></i>
+                    </div>
+                </div>
+                <h3 class="text-2xl font-bold gradient-text mb-2">DeployIT</h3>
+                <p class="text-gray-600 mb-8">
+                    Deploy your GitHub projects with confidence and speed.
+                </p>
+                <div class="border-t border-gray-200 pt-8">
+                    <p class="text-gray-500 text-sm">
+                        © 2024 DeployIT. Built with ❤️ for developers using Node.js, Express, and MongoDB.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html> 

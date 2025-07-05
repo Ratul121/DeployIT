@@ -1,0 +1,988 @@
+<!-- App Details Page Content -->
+<style>
+    .log-container {
+        max-height: 400px;
+        overflow-y: auto;
+        font-family: 'Courier New', monospace;
+        background-color: #000000 !important;
+        color: #ffffff !important;
+        border: 1px solid #333333 !important;
+        border-radius: 8px !important;
+        padding: 12px !important;
+    }
+    
+    /* Ensure all log containers have black background */
+    #logsContainer,
+    #modalLogsContainer {
+        background-color: #000000 !important;
+        color: #ffffff !important;
+        border: 1px solid #333333 !important;
+        border-radius: 8px !important;
+    }
+    
+    /* Override any potential Tailwind background classes */
+    .log-container,
+    div.log-container,
+    #logsContainer.log-container,
+    #modalLogsContainer.log-container {
+        background-color: #000000 !important;
+        background: #000000 !important;
+        color: #ffffff !important;
+    }
+    
+    /* Ensure log entries are visible */
+    .log-entry * {
+        color: inherit !important;
+    }
+    .log-entry {
+        padding: 4px 8px;
+        border-left: 3px solid transparent;
+        font-size: 13px;
+        line-height: 1.4;
+        margin-bottom: 2px;
+        border-radius: 2px;
+    }
+    .log-entry.info {
+        border-left-color: #3b82f6;
+        color: #93c5fd;
+        background-color: rgba(59, 130, 246, 0.1);
+    }
+    .log-entry.warn {
+        border-left-color: #f59e0b;
+        color: #fbbf24;
+        background-color: rgba(245, 158, 11, 0.1);
+    }
+    .log-entry.error {
+        border-left-color: #ef4444;
+        color: #f87171;
+        background-color: rgba(239, 68, 68, 0.1);
+    }
+    .log-entry.debug {
+        border-left-color: #6b7280;
+        color: #9ca3af;
+        background-color: rgba(107, 114, 128, 0.1);
+    }
+    .log-entry.stdout {
+        border-left-color: #10b981;
+        color: #34d399;
+        background-color: rgba(16, 185, 129, 0.1);
+    }
+    .log-entry.stderr {
+        border-left-color: #ef4444;
+        color: #fca5a5;
+        background-color: rgba(239, 68, 68, 0.15);
+    }
+    
+    /* Scrollbar styling for log container */
+    .log-container::-webkit-scrollbar {
+        width: 8px;
+    }
+    .log-container::-webkit-scrollbar-track {
+        background: #1a1a1a;
+        border-radius: 4px;
+    }
+    .log-container::-webkit-scrollbar-thumb {
+        background: #444444;
+        border-radius: 4px;
+    }
+    .log-container::-webkit-scrollbar-thumb:hover {
+        background: #555555;
+    }
+    
+    /* Notification improvements */
+    #notifications {
+        max-height: calc(100vh - 2rem);
+        overflow-y: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    #notifications::-webkit-scrollbar {
+        display: none;
+    }
+    
+    /* Notification styling */
+    .notification-item {
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .notification-enter {
+        animation: slideInRight 0.3s ease-out;
+    }
+    
+    .notification-exit {
+        animation: slideOutRight 0.3s ease-in;
+    }
+    
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+</style>
+        <!-- App Header -->
+        <div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+            <div class="px-4 py-5 sm:px-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900"><%= app.name %></h1>
+                        <p class="mt-1 text-sm text-gray-500">
+                            <i class="fab fa-github mr-1"></i>
+                            <a href="<%= app.repository.url %>" target="_blank" class="text-blue-600 hover:text-blue-800">
+                                <%= app.repository.fullName %>
+                            </a>
+                        </p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                            <% if (app.deployment.status === 'running') { %>
+                                bg-green-100 text-green-800
+                            <% } else if (app.deployment.status === 'failed') { %>
+                                bg-red-100 text-red-800
+                            <% } else if (app.deployment.status === 'building') { %>
+                                bg-yellow-100 text-yellow-800
+                            <% } else { %>
+                                bg-gray-100 text-gray-800
+                            <% } %>
+                        ">
+                            <i class="fas fa-circle text-xs mr-1"></i>
+                            <%= app.deployment.status %>
+                        </span>
+                        <% if (app.url) { %>
+                            <a href="<%= app.url %>" target="_blank" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                                <i class="fas fa-external-link-alt mr-1"></i>
+                                Visit App
+                            </a>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- App Controls -->
+        <div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+            <div class="px-4 py-5 sm:px-6">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">App Controls</h3>
+                <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                    Manage your application deployment and lifecycle.
+                </p>
+            </div>
+            <div class="border-t border-gray-200 px-4 py-5 sm:px-6">
+                <div class="flex space-x-3">
+                    <% if (app.deployment.status === 'stopped' && app.deployment.pm2Id) { %>
+                        <button id="startBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                            <i class="fas fa-play mr-1"></i>
+                            Start
+                        </button>
+                    <% } else { %>
+                        <button id="deployBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                            <i class="fas fa-rocket mr-1"></i>
+                            Deploy
+                        </button>
+                    <% } %>
+                    <% if (app.deployment.status === 'running') { %>
+                        <button id="restartBtn" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                            <i class="fas fa-redo mr-1"></i>
+                            Restart
+                        </button>
+                        <button id="stopBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                            <i class="fas fa-stop mr-1"></i>
+                            Stop
+                        </button>
+                    <% } %>
+                    <button id="deleteBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                        <i class="fas fa-trash mr-1"></i>
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- App Information -->
+        <div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+            <div class="px-4 py-5 sm:px-6">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">App Information</h3>
+            </div>
+            <div class="border-t border-gray-200">
+                <dl>
+                    <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Repository</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                            <a href="<%= app.repository.url %>" target="_blank" class="text-blue-600 hover:text-blue-800">
+                                <%= app.repository.fullName %>
+                            </a>
+                        </dd>
+                    </div>
+                    <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Branch</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2"><%= app.repository.branch %></dd>
+                    </div>
+                    <% if (app.repository.lastCommit && app.repository.lastCommit.sha) { %>
+                    <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Latest Commit</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                            <div class="space-y-2">
+                                <div class="flex items-center space-x-2">
+                                    <code class="bg-gray-200 px-2 py-1 rounded text-xs font-mono">
+                                        <%= app.repository.lastCommit.shortSha %>
+                                    </code>
+                                    <% if (app.repository.lastCommit.url) { %>
+                                    <a href="<%= app.repository.lastCommit.url %>" target="_blank" class="text-blue-600 hover:text-blue-800 text-xs">
+                                        <i class="fas fa-external-link-alt"></i>
+                                    </a>
+                                    <% } %>
+                                </div>
+                                <div class="text-sm text-gray-700">
+                                    "<%= app.repository.lastCommit.message %>"
+                                </div>
+                                <div class="text-xs text-gray-500">
+                                    by <%= app.repository.lastCommit.author %>
+                                    • <%= new Date(app.repository.lastCommit.date).toLocaleString() %>
+                                </div>
+                            </div>
+                        </dd>
+                    </div>
+                    <% } %>
+                    <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Startup Command</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono bg-gray-100 px-2 py-1 rounded">
+                            <%= app.configuration.startupCommand %>
+                        </dd>
+                    </div>
+                    <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Build Command</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono bg-gray-100 px-2 py-1 rounded">
+                            <%= app.configuration.buildCommand %>
+                        </dd>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Port</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2"><%= app.configuration.port %></dd>
+                    </div>
+                    <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Created</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2"><%= app.createdAt.toLocaleString() %></dd>
+                    </div>
+                    <% if (app.deployment.deployedAt) { %>
+                        <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                            <dt class="text-sm font-medium text-gray-500">Last Deployed</dt>
+                            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2"><%= app.deployment.deployedAt.toLocaleString() %></dd>
+                        </div>
+                    <% } %>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Real-time Logs -->
+        <div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+            <div class="px-4 py-5 sm:px-6 flex justify-between items-center">
+                <div>
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">Application Logs</h3>
+                    <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                        <span id="logStatus">Live PM2 application logs (Last 3 days) - Latest first</span>
+                        <% if (app.deployment.status === 'running') { %>
+                            <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                <i class="fas fa-circle text-xs mr-1"></i>
+                                Running
+                            </span>
+                        <% } %>
+                    </p>
+                </div>
+                <div class="flex space-x-2">
+                    <button id="refreshLogsBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
+                        <i class="fas fa-sync mr-1"></i>
+                        Refresh
+                    </button>
+                    <button id="clearLogsBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-sm">
+                        <i class="fas fa-trash mr-1"></i>
+                        Clear
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Pagination Controls -->
+            <div class="border-t border-gray-200 px-4 py-3 bg-gray-50 flex items-center justify-between">
+                <div class="flex items-center text-sm text-gray-700">
+                    <span id="logInfo">Loading...</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button id="prevPageBtn" class="bg-white border border-gray-300 rounded-md px-3 py-1 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <i class="fas fa-chevron-left mr-1"></i>
+                        Previous
+                    </button>
+                    <span id="pageInfo" class="text-sm text-gray-700">Page 1 of 1</span>
+                    <button id="nextPageBtn" class="bg-white border border-gray-300 rounded-md px-3 py-1 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Next
+                        <i class="fas fa-chevron-right ml-1"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-200">
+                <div id="logsContainer" class="log-container h-96" style="background-color: #000000 !important; color: #ffffff !important; padding: 12px !important;">
+                    <div class="text-gray-300 text-sm">Loading application logs...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Deployment History -->
+        <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+            <div class="px-4 py-5 sm:px-6">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Deployment History</h3>
+                <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                    Recent deployment attempts and their status
+                </p>
+            </div>
+            <% if (deployments.length === 0) { %>
+                <div class="px-4 py-8 text-center">
+                    <i class="fas fa-rocket text-gray-400 text-3xl mb-2"></i>
+                    <p class="text-gray-500">No deployments yet</p>
+                </div>
+            <% } else { %>
+                <ul class="divide-y divide-gray-200">
+                    <% deployments.forEach(deployment => { %>
+                        <li class="px-4 py-4 sm:px-6">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div class="w-8 h-8 rounded-full flex items-center justify-center
+                                            <% if (deployment.status === 'success') { %>
+                                                bg-green-100 text-green-600
+                                            <% } else if (deployment.status === 'failed') { %>
+                                                bg-red-100 text-red-600
+                                            <% } else { %>
+                                                bg-yellow-100 text-yellow-600
+                                            <% } %>
+                                        ">
+                                            <i class="fas fa-
+                                                <% if (deployment.status === 'success') { %>
+                                                    check
+                                                <% } else if (deployment.status === 'failed') { %>
+                                                    times
+                                                <% } else { %>
+                                                    clock
+                                                <% } %>
+                                            "></i>
+                                        </div>
+                                    </div>
+                                    <div class="ml-4">
+                                        <p class="text-sm font-medium text-gray-900">
+                                            Deployment <%= deployment.status %>
+                                        </p>
+                                        <p class="text-sm text-gray-500">
+                                            <%= deployment.startedAt.toLocaleString() %>
+                                            <% if (deployment.completedAt) { %>
+                                                - <%= deployment.completedAt.toLocaleString() %>
+                                            <% } %>
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button class="view-deployment-logs text-blue-600 hover:text-blue-800 text-sm" data-deployment-id="<%= deployment._id %>">
+                                        <i class="fas fa-eye mr-1"></i>
+                                        View Logs
+                                    </button>
+                                </div>
+                            </div>
+                        </li>
+                    <% }); %>
+                </ul>
+            <% } %>
+        </div>
+    </div>
+
+    <!-- Loading Modal -->
+    <div id="loadingModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+            <div class="flex items-center">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900">Processing...</h3>
+                    <p class="text-sm text-gray-500">Please wait...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Deployment Logs Modal -->
+    <div id="deploymentLogsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-lg font-medium text-gray-900">Deployment Logs</h3>
+                <button id="closeLogsModal" class="text-gray-400 hover:text-gray-500 focus:outline-none">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="flex-1 overflow-hidden">
+                <div id="modalLogsContainer" class="log-container h-96 overflow-y-auto" style="background-color: #000000 !important; color: #ffffff !important; padding: 12px !important;">
+                    <div class="text-gray-300 text-sm">Loading logs...</div>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
+                <button id="closeLogsModalBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notifications" class="fixed top-4 right-4 z-[9999] pointer-events-none w-80"></div>
+
+    <script>
+        const socket = io();
+        const appId = '<%= app._id %>';
+        
+        // Connect to socket and join app room
+        socket.emit('authenticate', { userId: '<%= user._id %>' });
+        socket.emit('join_app', { appId });
+
+        // Listen for deployment logs
+        socket.on('deployment_log', (data) => {
+            if (data.appId === appId) {
+                addLogEntry(data.level, data.message, data.timestamp);
+            }
+        });
+
+        // Listen for deployment status updates
+        socket.on('deployment_status', (data) => {
+            if (data.appId === appId) {
+                showNotification(`Deployment ${data.status}`, data.status === 'success' ? 'success' : data.status === 'failed' ? 'error' : 'info');
+                
+                // If deployment succeeded, start loading app logs
+                if (data.status === 'success') {
+                    setTimeout(() => {
+                        loadAppLogs();
+                        startLogRefresh();
+                    }, 2000);
+                }
+                
+                // Reload page to update status
+                setTimeout(() => location.reload(), 3000);
+            }
+        });
+
+        // Listen for app status updates
+        socket.on('app_status', (data) => {
+            if (data.appId === appId) {
+                showNotification(`App ${data.status}`, data.status === 'running' ? 'success' : 'info');
+                
+                // Update log refresh based on app status
+                if (data.status === 'running') {
+                    loadAppLogs();
+                    startLogRefresh();
+                } else {
+                    stopLogRefresh();
+                }
+                
+                // Reload page to update status
+                setTimeout(() => location.reload(), 2000);
+            }
+        });
+
+        // App control functions
+        async function deployApp() {
+            showLoading();
+            try {
+                const response = await fetch(`/apps/${appId}/deploy`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showNotification('Deployment started!', 'success');
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                showNotification(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function startApp() {
+            showLoading();
+            try {
+                const response = await fetch(`/apps/${appId}/restart`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showNotification('App started!', 'success');
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                showNotification(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function restartApp() {
+            showLoading();
+            try {
+                const response = await fetch(`/apps/${appId}/restart`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showNotification('App restarted!', 'success');
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                showNotification(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function stopApp() {
+            showLoading();
+            try {
+                const response = await fetch(`/apps/${appId}/stop`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showNotification('App stopped!', 'success');
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                showNotification(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function deleteApp() {
+            if (!confirm('Are you sure you want to delete this app? This action cannot be undone.')) {
+                return;
+            }
+            
+            showLoading();
+            try {
+                const response = await fetch(`/apps/${appId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showNotification('App deleted!', 'success');
+                    setTimeout(() => window.location.href = '/dashboard', 1500);
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                showNotification(error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Log management
+        function addLogEntry(level, message, timestamp, type = null) {
+            const logsContainer = document.getElementById('logsContainer');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type || level}`;
+            
+            // Enhanced timestamp formatting with date and time
+            const date = new Date(timestamp);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            const formattedTime = month + '/' + day + '/' + year + ' ' + hours + ':' + minutes + ':' + seconds;
+            
+            const typePrefix = type ? `[${type.toUpperCase()}] ` : '';
+            logEntry.innerHTML = `<span class="log-timestamp">[${formattedTime}]</span> <span class="log-type">${typePrefix}</span><span class="log-message">${message}</span>`;
+            
+            logsContainer.appendChild(logEntry);
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('logsContainer').innerHTML = '<div class="text-gray-400 text-sm">Logs cleared.</div>';
+        }
+
+        // Pagination state
+        let currentPage = 1;
+        const pageSize = 50;
+        
+        // Load PM2 application logs with pagination
+        async function loadAppLogs(page = 1) {
+            try {
+                const response = await fetch(`/apps/${appId}/logs?page=${page}&pageSize=${pageSize}`);
+                
+                const logsContainer = document.getElementById('logsContainer');
+                const logStatus = document.getElementById('logStatus');
+                const logInfo = document.getElementById('logInfo');
+                const pageInfo = document.getElementById('pageInfo');
+                const prevBtn = document.getElementById('prevPageBtn');
+                const nextBtn = document.getElementById('nextPageBtn');
+                
+                if (response.status === 429) {
+                    // Rate limited - show message and stop auto-refresh temporarily
+                    logsContainer.innerHTML = '<div class="text-yellow-600 text-sm">Rate limited - please wait before refreshing logs again.</div>';
+                    logStatus.innerHTML = 'Rate limited - reducing refresh frequency';
+                    
+                    // Stop auto-refresh temporarily
+                    stopLogRefresh();
+                    setTimeout(startLogRefresh, 30000); // Resume after 30 seconds
+                    return;
+                }
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    logsContainer.innerHTML = '';
+                    currentPage = page;
+                    
+                    if (data.logs && data.logs.length > 0) {
+                        data.logs.forEach(log => {
+                            addLogEntry(log.level, log.message, log.timestamp, log.type);
+                        });
+                        
+                        // Update status
+                        if (data.processInfo) {
+                            const uptime = Math.floor((Date.now() - data.processInfo.uptime) / 1000);
+                            const memory = (data.processInfo.memory / 1024 / 1024).toFixed(1);
+                            logStatus.innerHTML = `Live PM2 logs (Last 3 days) - PID: ${data.processInfo.pid}, Uptime: ${uptime}s, Memory: ${memory}MB, CPU: ${data.processInfo.cpu}%`;
+                        } else {
+                            logStatus.innerHTML = `Live PM2 logs (Last 3 days) - Status: ${data.status}`;
+                        }
+                        
+                        // Update pagination info
+                        if (data.pagination) {
+                            logInfo.innerHTML = `Showing ${data.logs.length} of ${data.pagination.totalLines} log entries`;
+                            pageInfo.innerHTML = `Page ${data.pagination.page} of ${data.pagination.totalPages}`;
+                            
+                            prevBtn.disabled = !data.pagination.hasPrev;
+                            nextBtn.disabled = !data.pagination.hasNext;
+                        }
+                    } else {
+                        logsContainer.innerHTML = '<div class="text-gray-400 text-sm">No logs available. App may not be running or no output generated yet.</div>';
+                        logStatus.innerHTML = `PM2 Status: ${data.status || 'unknown'}`;
+                        logInfo.innerHTML = 'No log entries found';
+                        pageInfo.innerHTML = 'Page 1 of 1';
+                        prevBtn.disabled = true;
+                        nextBtn.disabled = true;
+                    }
+                } else {
+                    throw new Error(data.error || 'Failed to load logs');
+                }
+            } catch (error) {
+                console.error('Error loading app logs:', error);
+                
+                if (error.message.includes('JSON')) {
+                    document.getElementById('logsContainer').innerHTML = `<div class="text-red-400 text-sm">Server error - please try again later</div>`;
+                } else {
+                    document.getElementById('logsContainer').innerHTML = `<div class="text-red-400 text-sm">Error loading logs: ${error.message}</div>`;
+                }
+                
+                // Don't show notification for rate limiting
+                if (!error.message.includes('429')) {
+                    showNotification('Failed to load application logs: ' + error.message, 'error');
+                }
+            }
+        }
+        
+        // Pagination functions
+        function loadPreviousPage() {
+            if (currentPage > 1) {
+                loadAppLogs(currentPage - 1);
+            }
+        }
+        
+        function loadNextPage() {
+            loadAppLogs(currentPage + 1);
+        }
+
+        // Auto-refresh logs every 10 seconds if app is running (reduced frequency to avoid rate limiting)
+        let logRefreshInterval = null;
+        
+        function startLogRefresh() {
+            if (logRefreshInterval) {
+                clearInterval(logRefreshInterval);
+            }
+            
+            const isRunning = '<%= app.deployment.status %>' === 'running';
+            if (isRunning) {
+                logRefreshInterval = setInterval(loadAppLogs, 10000); // 10 seconds instead of 5
+            }
+        }
+
+        function stopLogRefresh() {
+            if (logRefreshInterval) {
+                clearInterval(logRefreshInterval);
+                logRefreshInterval = null;
+            }
+        }
+        
+        function stopLogRefresh() {
+            if (logRefreshInterval) {
+                clearInterval(logRefreshInterval);
+                logRefreshInterval = null;
+            }
+        }
+
+        async function viewDeploymentLogs(deploymentId) {
+            try {
+                // Show the modal
+                const modal = document.getElementById('deploymentLogsModal');
+                const modalLogsContainer = document.getElementById('modalLogsContainer');
+                
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                
+                // Clear previous logs
+                modalLogsContainer.innerHTML = '<div class="text-gray-300 text-sm">Loading logs...</div>';
+                
+                // Fetch deployment logs
+                const response = await fetch(`/apps/${appId}/deployments/${deploymentId}/logs`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    modalLogsContainer.innerHTML = '';
+                    
+                    if (data.logs && data.logs.length > 0) {
+                        data.logs.forEach(log => {
+                            const logEntry = document.createElement('div');
+                            logEntry.className = `log-entry ${log.level}`;
+                            
+                            const time = new Date(log.timestamp).toLocaleTimeString();
+                            logEntry.innerHTML = `[${time}] ${log.message}`;
+                            
+                            modalLogsContainer.appendChild(logEntry);
+                        });
+                        
+                        // Scroll to bottom
+                        modalLogsContainer.scrollTop = modalLogsContainer.scrollHeight;
+                    } else {
+                        modalLogsContainer.innerHTML = '<div class="text-gray-300 text-sm">No logs available for this deployment.</div>';
+                    }
+                } else {
+                    throw new Error(data.error || 'Failed to load logs');
+                }
+            } catch (error) {
+                console.error('Error loading deployment logs:', error);
+                showNotification('Failed to load deployment logs: ' + error.message, 'error');
+                
+                // Close modal on error
+                const modal = document.getElementById('deploymentLogsModal');
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+        
+        function closeDeploymentLogsModal() {
+            const modal = document.getElementById('deploymentLogsModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // Utility functions
+        function showLoading() {
+            document.getElementById('loadingModal').classList.remove('hidden');
+            document.getElementById('loadingModal').classList.add('flex');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingModal').classList.add('hidden');
+            document.getElementById('loadingModal').classList.remove('flex');
+        }
+
+        // Enhanced notification system
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `transform transition-all duration-300 ease-in-out translate-x-full opacity-0 w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden border-l-4`;
+            
+            const typeColors = {
+                info: { bg: 'bg-blue-50', text: 'text-blue-800', border: 'border-blue-400', icon: 'info-circle' },
+                success: { bg: 'bg-green-50', text: 'text-green-800', border: 'border-green-400', icon: 'check-circle' },
+                warning: { bg: 'bg-yellow-50', text: 'text-yellow-800', border: 'border-yellow-400', icon: 'exclamation-triangle' },
+                error: { bg: 'bg-red-50', text: 'text-red-800', border: 'border-red-400', icon: 'exclamation-circle' }
+            };
+            
+            const colors = typeColors[type] || typeColors.info;
+            notification.classList.add(colors.border);
+            
+            notification.innerHTML = `
+                <div class="p-3 ${colors.bg}">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-${colors.icon} ${colors.text} text-base"></i>
+                        </div>
+                        <div class="ml-3 flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-900 break-words">${message}</p>
+                        </div>
+                        <div class="ml-2 flex-shrink-0">
+                            <button class="notification-close bg-transparent rounded-full inline-flex text-gray-400 hover:text-gray-600 focus:outline-none p-1 hover:bg-gray-200 transition-colors">
+                                <i class="fas fa-times text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Add to notifications container
+            const notificationsContainer = document.getElementById('notifications');
+            notificationsContainer.insertBefore(notification, notificationsContainer.firstChild);
+            
+            // Animate in
+            setTimeout(() => {
+                notification.classList.remove('translate-x-full', 'opacity-0');
+                notification.classList.add('translate-x-0', 'opacity-100');
+            }, 100);
+            
+            // Auto-hide after 5 seconds
+            const autoHideTimeout = setTimeout(() => {
+                hideNotification(notification);
+            }, 5000);
+            
+            // Store timeout reference for manual close
+            notification.dataset.timeoutId = autoHideTimeout;
+            
+            return notification;
+        }
+        
+        // Helper function to hide notification
+        function hideNotification(notification) {
+            if (notification && notification.parentElement) {
+                // Clear timeout if exists
+                if (notification.dataset.timeoutId) {
+                    clearTimeout(notification.dataset.timeoutId);
+                }
+                
+                notification.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(() => {
+                    if (notification.parentElement) {
+                        notification.parentElement.removeChild(notification);
+                    }
+                }, 300);
+            }
+        }
+
+        // Add event listeners when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // App control buttons
+            const deployBtn = document.getElementById('deployBtn');
+            const startBtn = document.getElementById('startBtn');
+            const restartBtn = document.getElementById('restartBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const deleteBtn = document.getElementById('deleteBtn');
+            const clearLogsBtn = document.getElementById('clearLogsBtn');
+            const refreshLogsBtn = document.getElementById('refreshLogsBtn');
+
+            if (deployBtn) {
+                deployBtn.addEventListener('click', deployApp);
+            }
+            if (startBtn) {
+                startBtn.addEventListener('click', startApp);
+            }
+            if (restartBtn) {
+                restartBtn.addEventListener('click', restartApp);
+            }
+            if (stopBtn) {
+                stopBtn.addEventListener('click', stopApp);
+            }
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', deleteApp);
+            }
+            if (clearLogsBtn) {
+                clearLogsBtn.addEventListener('click', clearLogs);
+            }
+            if (refreshLogsBtn) {
+                refreshLogsBtn.addEventListener('click', () => loadAppLogs(currentPage));
+            }
+
+            // Pagination buttons
+            const prevPageBtn = document.getElementById('prevPageBtn');
+            const nextPageBtn = document.getElementById('nextPageBtn');
+            
+            if (prevPageBtn) {
+                prevPageBtn.addEventListener('click', loadPreviousPage);
+            }
+            if (nextPageBtn) {
+                nextPageBtn.addEventListener('click', loadNextPage);
+            }
+
+            // Load initial logs and start auto-refresh
+            loadAppLogs();
+            startLogRefresh();
+
+            // Deployment logs buttons
+            const viewLogsButtons = document.querySelectorAll('.view-deployment-logs');
+            viewLogsButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const deploymentId = this.getAttribute('data-deployment-id');
+                    viewDeploymentLogs(deploymentId);
+                });
+            });
+
+            // Modal close buttons
+            const closeLogsModal = document.getElementById('closeLogsModal');
+            const closeLogsModalBtn = document.getElementById('closeLogsModalBtn');
+            
+            if (closeLogsModal) {
+                closeLogsModal.addEventListener('click', closeDeploymentLogsModal);
+            }
+            if (closeLogsModalBtn) {
+                closeLogsModalBtn.addEventListener('click', closeDeploymentLogsModal);
+            }
+
+            // Close modal when clicking outside
+            document.getElementById('deploymentLogsModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeDeploymentLogsModal();
+                }
+            });
+
+            // Notification close buttons (using event delegation)
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('.notification-close')) {
+                    const notification = e.target.closest('.w-full');
+                    if (notification) {
+                        hideNotification(notification);
+                    }
+                }
+            });
+        });
+    </script> 
