@@ -201,7 +201,7 @@ router.post('/:id/deploy', async (req, res) => {
     console.log(`Starting deployment for app: ${app.name}`);
     
     // Start deployment in background
-    deploymentService.deployApp(app._id, req.user._id)
+    deploymentService.deployApp(app._id, req.user._id, req.user.accessToken)
       .catch(error => {
         console.error('Deployment failed:', error);
       });

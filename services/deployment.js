@@ -73,7 +73,7 @@ class DeploymentService {
   }
 
   // Deploy application
-  async deployApp(appId, userId) {
+  async deployApp(appId, userId, accessToken) {
     let deployment = null;
     
     try {
@@ -102,14 +102,14 @@ class DeploymentService {
       await app.save();
 
       // Update latest commit information before deployment
-      await this.updateLatestCommit(app, userId);
+      await this.updateLatestCommit(app, userId, accessToken);
       
       // Emit deployment started
       socketService.emitDeploymentStatus(appId, 'building');
       await this.addDeploymentLog(deployment, 'info', 'Deployment started');
       
-      // Clone repository
-      await this.cloneRepository(app, deployment);
+      // Clone repository with access token
+      await this.cloneRepository(app, deployment, accessToken);
       
       // Install dependencies
       await this.installDependencies(app, deployment);
@@ -174,10 +174,16 @@ class DeploymentService {
   }
 
   // Clone repository
-  async cloneRepository(app, deployment) {
+  async cloneRepository(app, deployment, accessToken) {
     return new Promise(async (resolve, reject) => {
       const appDir = path.join(this.deploymentDir, app._id.toString());
-      const cloneUrl = app.repository.cloneUrl;
+      
+      // Create authenticated clone URL
+      let cloneUrl = app.repository.cloneUrl;
+      if (accessToken && cloneUrl.includes('github.com')) {
+        // Convert HTTPS URL to authenticated URL
+        cloneUrl = cloneUrl.replace('https://github.com/', `https://${accessToken}@github.com/`);
+      }
       
       // Clean up existing directory if it exists
       try {
@@ -191,7 +197,14 @@ class DeploymentService {
       
       await this.addDeploymentLog(deployment, 'info', `Cloning repository: ${app.repository.fullName}`);
       
+      // Use authenticated URL but don't log it for security
       const gitClone = spawn('git', ['clone', cloneUrl, appDir]);
+      
+      // Set timeout for git clone (5 minutes)
+      const timeout = setTimeout(() => {
+        gitClone.kill('SIGTERM');
+        reject(new Error('Git clone timed out after 5 minutes'));
+      }, 5 * 60 * 1000);
       
       gitClone.stdout.on('data', async (data) => {
         const message = data.toString().trim();
@@ -208,12 +221,19 @@ class DeploymentService {
       });
       
       gitClone.on('close', async (code) => {
+        clearTimeout(timeout);
         if (code === 0) {
           await this.addDeploymentLog(deployment, 'info', 'Repository cloned successfully');
           resolve();
         } else {
           reject(new Error(`Git clone failed with code ${code}`));
         }
+      });
+      
+      gitClone.on('error', async (error) => {
+        clearTimeout(timeout);
+        await this.addDeploymentLog(deployment, 'error', `Git clone error: ${error.message}`);
+        reject(error);
       });
     });
   }
@@ -665,19 +685,17 @@ class DeploymentService {
   }
 
   // Update latest commit information
-  async updateLatestCommit(app, userId) {
+  async updateLatestCommit(app, userId, accessToken) {
     try {
-      const User = require('../models/User');
       const githubService = require('./github');
       
-      const user = await User.findById(userId);
-      if (!user || !user.accessToken) {
-        console.error('User not found or no access token');
+      if (!accessToken) {
+        console.error('No access token provided');
         return;
       }
 
       const latestCommit = await githubService.getLatestCommit(
-        user.accessToken,
+        accessToken,
         app.repository.owner,
         app.repository.name,
         app.repository.branch
