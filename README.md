@@ -63,6 +63,11 @@ A Node.js web application that enables users to connect their GitHub accounts an
    PORT=3000
    BASE_URL=http://localhost:3000
    
+   # Apps Base URL (for deployed apps)
+   # Local development: http://localhost
+   # Production: https://yourdomain.com or http://your-server-ip
+   APPS_BASE_URL=http://localhost
+   
    # PM2 Configuration
    PM2_PORT_START=4000
    PM2_PORT_END=5000
@@ -193,10 +198,14 @@ npm run dev
 ### Environment Variables
 - `NODE_ENV`: Set to `development` for development mode
 - `PORT`: Server port (default: 3000)
+- `BASE_URL`: Main application URL (default: http://localhost:3000)
+- `APPS_BASE_URL`: Base URL for deployed apps (default: http://localhost)
 - `DATABASE_URL`: MongoDB connection string
 - `GITHUB_CLIENT_ID`: GitHub OAuth client ID
 - `GITHUB_CLIENT_SECRET`: GitHub OAuth client secret
 - `SESSION_SECRET`: Session encryption secret
+- `PM2_PORT_START`: Starting port for deployed apps (default: 4000)
+- `PM2_PORT_END`: Ending port for deployed apps (default: 5000)
 
 ### Adding New Features
 1. Create models in `models/` directory
