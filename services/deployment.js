@@ -151,25 +151,34 @@ class DeploymentService {
 
       const app = await App.findById(appId);
       if (app) {
-        // Stop the app if it was running before deployment failure
-        if (app.deployment.status === 'running' || app.deployment.status === 'building') {
+        // Clean up any PM2 process that might have been started
+        if (app.deployment.pm2Id) {
           try {
-            await this.addDeploymentLog(deployment, 'info', 'Stopping app due to deployment failure');
-            await this.stopAppProcess(app);
-            app.deployment.status = 'stopped';
-            await this.addDeploymentLog(deployment, 'info', 'App stopped successfully');
-          } catch (stopError) {
-            console.error('Error stopping app after deployment failure:', stopError);
-            await this.addDeploymentLog(deployment, 'warn', `Warning: Could not stop app: ${stopError.message}`);
-            app.deployment.status = 'failed';
+            await this.addDeploymentLog(deployment, 'info', 'Cleaning up PM2 process due to deployment failure');
+            await new Promise((resolve) => {
+              pm2.delete(app.deployment.pm2Id, (deleteErr) => {
+                if (deleteErr) {
+                  console.error('Error deleting PM2 process:', deleteErr);
+                }
+                resolve();
+              });
+            });
+            await this.addDeploymentLog(deployment, 'info', 'PM2 process cleaned up');
+          } catch (cleanupError) {
+            console.error('Error cleaning up PM2 process:', cleanupError);
+            await this.addDeploymentLog(deployment, 'warn', `Warning: Could not clean up PM2 process: ${cleanupError.message}`);
           }
-        } else {
-          app.deployment.status = 'failed';
         }
+        
+        // Set app status to failed
+        app.deployment.status = 'failed';
+        app.deployment.lastError = error.message;
+        app.deployment.lastErrorAt = new Date();
         await app.save();
       }
 
       socketService.emitDeploymentStatus(appId, 'failed');
+      socketService.emitAppStatus(appId, 'failed');
       
       throw error;
     }
@@ -281,6 +290,14 @@ class DeploymentService {
       const appDir = path.join(this.deploymentDir, app._id.toString());
       const pm2Id = `app_${app._id}`;
       
+      // Ensure log directory exists
+      const logDir = path.join(this.deploymentDir, 'logs');
+      try {
+        await fs.mkdir(logDir, { recursive: true });
+      } catch (error) {
+        console.error('Error creating log directory:', error);
+      }
+      
       const pm2Config = {
         name: pm2Id,
         script: app.configuration.startupCommand.split(' ')[0],
@@ -291,16 +308,19 @@ class DeploymentService {
           NODE_ENV: 'production',
           ...Object.fromEntries(app.configuration.environmentVariables)
         },
-        log_file: path.join(this.deploymentDir, 'logs', `${pm2Id}.log`),
-        out_file: path.join(this.deploymentDir, 'logs', `${pm2Id}.out`),
-        error_file: path.join(this.deploymentDir, 'logs', `${pm2Id}.err`),
+        log_file: path.join(logDir, `${pm2Id}.log`),
+        out_file: path.join(logDir, `${pm2Id}.out`),
+        error_file: path.join(logDir, `${pm2Id}.err`),
         max_memory_restart: '500M',
         instances: 1,
         exec_mode: 'fork',
         // Add timestamp formatting to PM2 logs
         log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
         merge_logs: true,
-        time: true
+        time: true,
+        // Ensure PM2 doesn't try to use null paths
+        disable_logs: false,
+        combine_logs: true
       };
 
       await this.addDeploymentLog(deployment, 'info', `Starting application with PM2: ${pm2Id}`);
@@ -313,15 +333,41 @@ class DeploymentService {
           return;
         }
         
-        pm2.start(pm2Config, async (err) => {
-          if (err) {
-            await this.addDeploymentLog(deployment, 'error', `PM2 start failed: ${err.message}`);
-            reject(err);
-          } else {
-            app.deployment.pm2Id = pm2Id;
-            await this.addDeploymentLog(deployment, 'info', `Application started successfully on port ${app.configuration.port}`);
-            resolve();
-          }
+        // First, try to delete any existing process with the same name
+        pm2.delete(pm2Id, async (deleteErr) => {
+          // Ignore delete errors - process might not exist
+          
+          pm2.start(pm2Config, async (err, proc) => {
+            if (err) {
+              await this.addDeploymentLog(deployment, 'error', `PM2 start failed: ${err.message}`);
+              console.error('PM2 start error details:', err);
+              reject(err);
+            } else {
+              app.deployment.pm2Id = pm2Id;
+              await this.addDeploymentLog(deployment, 'info', `Application started successfully on port ${app.configuration.port}`);
+              
+              // Wait a moment and check if the process is actually running
+              setTimeout(async () => {
+                pm2.describe(pm2Id, async (describeErr, processDescription) => {
+                  if (describeErr || !processDescription || processDescription.length === 0) {
+                    await this.addDeploymentLog(deployment, 'error', 'Process failed to start properly');
+                    reject(new Error('Process failed to start properly'));
+                  } else {
+                    const process = processDescription[0];
+                    const status = process.pm2_env.status;
+                    
+                    if (status === 'errored' || status === 'stopped') {
+                      await this.addDeploymentLog(deployment, 'error', `Process status: ${status}`);
+                      reject(new Error(`Process is in ${status} state`));
+                    } else {
+                      await this.addDeploymentLog(deployment, 'info', `Process is running with status: ${status}`);
+                      resolve();
+                    }
+                  }
+                });
+              }, 2000);
+            }
+          });
         });
       });
     });
@@ -464,10 +510,62 @@ class DeploymentService {
     
     try {
       const app = await App.findById(appId);
-      if (!app || !app.deployment.pm2Id) {
+      if (!app) {
         return { 
           logs: [], 
-          status: 'not_running',
+          status: 'not_found',
+          pagination: {
+            page: 1,
+            pageSize,
+            totalLines: 0,
+            totalPages: 0,
+            hasNext: false,
+            hasPrev: false
+          }
+        };
+      }
+
+      // If app doesn't have PM2 ID, check for deployment logs
+      if (!app.deployment.pm2Id) {
+        // Try to get deployment logs for failed deployments
+        const recentDeployments = await Deployment.find({ appId })
+          .sort({ createdAt: -1 })
+          .limit(5);
+        
+        if (recentDeployments.length > 0) {
+          const deploymentLogs = [];
+          recentDeployments.forEach(deployment => {
+            if (deployment.logs && deployment.logs.length > 0) {
+              deployment.logs.forEach(log => {
+                deploymentLogs.push({
+                  timestamp: log.timestamp,
+                  message: log.message,
+                  level: log.level,
+                  type: 'deployment'
+                });
+              });
+            }
+          });
+          
+          deploymentLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+          
+          return {
+            logs: deploymentLogs.slice(0, lines),
+            status: app.deployment.status || 'not_running',
+            pagination: {
+              page: 1,
+              pageSize: lines,
+              totalLines: deploymentLogs.length,
+              totalPages: 1,
+              hasNext: false,
+              hasPrev: false
+            }
+          };
+        }
+        
+        return { 
+          logs: [], 
+          status: app.deployment.status || 'not_running',
           pagination: {
             page: 1,
             pageSize,

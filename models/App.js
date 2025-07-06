@@ -98,6 +98,14 @@ const appSchema = new mongoose.Schema({
     deploymentCount: {
       type: Number,
       default: 0
+    },
+    lastError: {
+      type: String,
+      default: null
+    },
+    lastErrorAt: {
+      type: Date,
+      default: null
     }
   },
   url: {

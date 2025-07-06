@@ -228,6 +228,74 @@ class GitHubService {
       throw new Error('Failed to fetch user profile from GitHub');
     }
   }
+
+  // Check for newer commits compared to a specific commit SHA
+  async checkForNewerCommits(accessToken, owner, repo, branch, currentCommitSha) {
+    try {
+      // Get the latest commit
+      const latestCommit = await this.getLatestCommit(accessToken, owner, repo, branch);
+      
+      // If the SHAs are different, there are newer commits
+      if (latestCommit.sha !== currentCommitSha) {
+        // Get commits since the current commit to count how many are newer
+        const response = await axios.get(`${this.baseURL}/repos/${owner}/${repo}/commits`, {
+          headers: {
+            'Authorization': `token ${accessToken}`,
+            'Accept': 'application/vnd.github.v3+json'
+          },
+          params: {
+            sha: branch,
+            per_page: 100
+          }
+        });
+
+        // Find the index of the current commit
+        const commits = response.data;
+        const currentCommitIndex = commits.findIndex(commit => commit.sha === currentCommitSha);
+        
+        if (currentCommitIndex === -1) {
+          // Current commit not found in recent commits, assume there are newer commits
+          return {
+            hasNewerCommits: true,
+            newerCommitsCount: commits.length,
+            latestCommit,
+            newerCommits: commits.slice(0, 5).map(commit => ({
+              sha: commit.sha,
+              message: commit.commit.message,
+              author: commit.commit.author.name,
+              date: commit.commit.author.date,
+              url: commit.html_url
+            }))
+          };
+        } else {
+          // Count commits newer than current
+          const newerCommits = commits.slice(0, currentCommitIndex);
+          return {
+            hasNewerCommits: newerCommits.length > 0,
+            newerCommitsCount: newerCommits.length,
+            latestCommit,
+            newerCommits: newerCommits.slice(0, 5).map(commit => ({
+              sha: commit.sha,
+              message: commit.commit.message,
+              author: commit.commit.author.name,
+              date: commit.commit.author.date,
+              url: commit.html_url
+            }))
+          };
+        }
+      }
+
+      return {
+        hasNewerCommits: false,
+        newerCommitsCount: 0,
+        latestCommit,
+        newerCommits: []
+      };
+    } catch (error) {
+      console.error('Error checking for newer commits:', error.response?.data || error.message);
+      throw new Error('Failed to check for newer commits from GitHub');
+    }
+  }
 }
 
 module.exports = new GitHubService(); 

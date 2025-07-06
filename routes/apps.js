@@ -350,6 +350,41 @@ router.get('/:id/deployments/:deploymentId/logs', async (req, res) => {
   }
 });
 
+// Check for newer commits
+router.get('/:id/check-commits', async (req, res) => {
+  try {
+    const app = await App.findOne({ 
+      _id: req.params.id, 
+      userId: req.user._id 
+    });
+    
+    if (!app) {
+      return res.status(404).json({ error: 'App not found' });
+    }
+    
+    // Check if we have a last commit to compare against
+    if (!app.repository.lastCommit || !app.repository.lastCommit.sha) {
+      return res.json({ 
+        hasNewerCommits: false, 
+        message: 'No commit information available' 
+      });
+    }
+    
+    const result = await githubService.checkForNewerCommits(
+      req.user.accessToken,
+      app.repository.owner,
+      app.repository.name,
+      app.repository.branch,
+      app.repository.lastCommit.sha
+    );
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error checking for newer commits:', error);
+    res.status(500).json({ error: 'Failed to check for newer commits' });
+  }
+});
+
 // Manual log cleanup trigger (for testing)
 router.post('/cleanup-logs', async (req, res) => {
   try {
