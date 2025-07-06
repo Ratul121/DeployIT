@@ -191,7 +191,9 @@ class DeploymentService {
         app.url = subdomainService.generateSubdomainUrl(app.subdomain);
       } else {
         // Fallback to port-based URL
-        app.url = `${process.env.APPS_BASE_URL || process.env.BASE_URL.replace(':3000', '')}:${app.configuration.port}`;
+        const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+        const baseUrl = process.env.APPS_BASE_URL || process.env.BASE_URL?.replace(':3000', '') || `${protocol}://localhost`;
+        app.url = `${baseUrl}:${app.configuration.port}`;
       }
       
       await app.save();
