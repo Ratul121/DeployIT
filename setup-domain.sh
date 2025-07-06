@@ -1,0 +1,749 @@
+#!/bin/bash
+
+# Apps-Only Domain Setup Script for DeployIT Platform
+# Usage: ./setup-domain-apps-only.sh yourdomain.com
+# This script only sets up subdomain routing for deployed apps
+
+set -e  # Exit on any error
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Function to print colored output
+print_status() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Function to check if command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Function to get server IP
+get_server_ip() {
+    local ip
+    ip=$(curl -s ifconfig.me 2>/dev/null || curl -s ipinfo.io/ip 2>/dev/null || echo "")
+    echo "$ip"
+}
+
+# Function to validate domain format
+validate_domain() {
+    local domain="$1"
+    if [[ ! "$domain" =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$ ]]; then
+        return 1
+    fi
+    return 0
+}
+
+# Function to backup existing nginx config
+backup_nginx_config() {
+    local domain="$1"
+    local config_file="/etc/nginx/sites-available/${domain}-apps"
+    
+    if [ -f "$config_file" ]; then
+        print_warning "Existing config found. Creating backup..."
+        sudo cp "$config_file" "${config_file}.backup.$(date +%Y%m%d_%H%M%S)"
+    fi
+}
+
+# Function to create nginx configuration for apps only
+create_nginx_config() {
+    local domain="$1"
+    local config_file="/etc/nginx/sites-available/${domain}-apps"
+    
+    print_status "Creating Nginx configuration for app subdomains on $domain..."
+    
+    sudo tee "$config_file" > /dev/null <<EOF
+# DeployIT Platform - App Subdomains Configuration for $domain
+# Generated on $(date)
+# This config only handles app subdomains, not the main domain
+
+# Wildcard subdomains for deployed apps ONLY
+server {
+    listen 80;
+    server_name *.$domain;
+    
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    
+    # Rate limiting for app subdomains
+    limit_req_zone \$binary_remote_addr zone=app_subdomain_limit:10m rate=20r/s;
+    limit_req zone=app_subdomain_limit burst=50 nodelay;
+    
+    location / {
+        # Extract subdomain
+        set \$subdomain "";
+        if (\$host ~* "^(.+)\.$domain\$") {
+            set \$subdomain \$1;
+        }
+        
+        # Block reserved/system subdomains
+        if (\$subdomain ~* "^(www|mail|ftp|ssh|admin|api|staging|dev|test|blog|shop|store|app|portal|dashboard|control|manage|system|root|secure|ssl|cdn|static|assets|media|files|docs|support|help|status|monitor|health)$") {
+            return 403 "Reserved subdomain - cannot be used for apps";
+        }
+        
+        # Only allow app subdomains (alphanumeric + hyphen, 3-20 chars)
+        if (\$subdomain !~ "^[a-z0-9][a-z0-9-]{1,18}[a-z0-9]$") {
+            return 400 "Invalid app subdomain format";
+        }
+        
+        # Proxy to the DeployIT platform proxy route
+        proxy_pass http://localhost:3000/proxy/\$subdomain;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Subdomain \$subdomain;
+        proxy_set_header X-Original-Host \$host;
+        proxy_set_header X-App-Request "true";
+        
+        # WebSocket support for apps
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        
+        # Timeouts optimized for apps
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 300s;
+        
+        # Buffer settings for better performance
+        proxy_buffering on;
+        proxy_buffer_size 4k;
+        proxy_buffers 8 4k;
+        
+        # Error handling
+        proxy_intercept_errors on;
+        error_page 502 503 504 /app_error.html;
+    }
+    
+    # Custom error page for app errors
+    location = /app_error.html {
+        internal;
+        return 502 '<!DOCTYPE html>
+<html>
+<head>
+    <title>App Unavailable</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
+        .container { max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #e74c3c; margin-bottom: 20px; }
+        p { color: #666; line-height: 1.6; }
+        .subdomain { color: #3498db; font-weight: bold; }
+        .btn { display: inline-block; margin-top: 20px; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚫 App Unavailable</h1>
+        <p>The app <span class="subdomain">"'\$subdomain'"</span> is currently unavailable.</p>
+        <p>This could be because:</p>
+        <ul style="text-align: left; color: #666;">
+            <li>The app is starting up</li>
+            <li>The app has crashed</li>
+            <li>The app is being deployed</li>
+            <li>The subdomain does not exist</li>
+        </ul>
+        <p>Please try again in a few moments.</p>
+    </div>
+</body>
+</html>';
+        add_header Content-Type text/html;
+    }
+    
+    # Health check for app proxy
+    location /app-proxy-health {
+        access_log off;
+        return 200 "app-proxy-healthy\n";
+        add_header Content-Type text/plain;
+    }
+}
+EOF
+
+    print_success "Nginx configuration created: $config_file"
+}
+
+# Function to enable nginx site
+enable_nginx_site() {
+    local domain="$1"
+    local config_file="${domain}-apps"
+    local enabled_file="/etc/nginx/sites-enabled/$config_file"
+    
+    print_status "Enabling Nginx site for app subdomains..."
+    
+    # Remove existing symlink if it exists
+    if [ -L "$enabled_file" ]; then
+        sudo rm "$enabled_file"
+    fi
+    
+    # Create new symlink
+    sudo ln -s "/etc/nginx/sites-available/$config_file" "$enabled_file"
+    
+    print_success "Nginx site enabled for app subdomains"
+}
+
+# Function to test and reload nginx
+reload_nginx() {
+    print_status "Testing Nginx configuration..."
+    
+    if sudo nginx -t; then
+        print_success "Nginx configuration test passed"
+        print_status "Reloading Nginx..."
+        sudo systemctl reload nginx
+        print_success "Nginx reloaded successfully"
+    else
+        print_error "Nginx configuration test failed!"
+        return 1
+    fi
+}
+
+# Function to update environment file
+update_env_file() {
+    local domain="$1"
+    local env_file=".env"
+    
+    print_status "Updating environment configuration..."
+    
+    # Backup existing .env
+    if [ -f "$env_file" ]; then
+        cp "$env_file" "${env_file}.backup.$(date +%Y%m%d_%H%M%S)"
+    fi
+    
+    # Update or add BASE_DOMAIN
+    if grep -q "^BASE_DOMAIN=" "$env_file" 2>/dev/null; then
+        sed -i "s/^BASE_DOMAIN=.*/BASE_DOMAIN=$domain/" "$env_file"
+    else
+        echo "BASE_DOMAIN=$domain" >> "$env_file"
+    fi
+    
+    # Add apps-only flag
+    if grep -q "^APPS_ONLY_SUBDOMAINS=" "$env_file" 2>/dev/null; then
+        sed -i "s/^APPS_ONLY_SUBDOMAINS=.*/APPS_ONLY_SUBDOMAINS=true/" "$env_file"
+    else
+        echo "APPS_ONLY_SUBDOMAINS=true" >> "$env_file"
+    fi
+    
+    # Ensure NODE_ENV is set for production
+    if ! grep -q "^NODE_ENV=" "$env_file" 2>/dev/null; then
+        echo "NODE_ENV=production" >> "$env_file"
+    fi
+    
+    print_success "Environment file updated with BASE_DOMAIN=$domain (apps only)"
+}
+
+# Function to install required packages
+install_dependencies() {
+    print_status "Installing required Node.js packages..."
+    
+    # Check if package.json exists
+    if [ ! -f "package.json" ]; then
+        print_error "package.json not found in current directory"
+        return 1
+    fi
+    
+    # Install http-proxy-middleware if not already installed
+    if ! npm list http-proxy-middleware >/dev/null 2>&1; then
+        print_status "Installing http-proxy-middleware..."
+        npm install http-proxy-middleware
+        print_success "http-proxy-middleware installed"
+    else
+        print_success "http-proxy-middleware already installed"
+    fi
+}
+
+# Function to create subdomain service (apps only version)
+create_subdomain_service() {
+    local service_file="services/subdomain.js"
+    
+    if [ -f "$service_file" ]; then
+        print_warning "Subdomain service already exists, creating apps-only version..."
+        cp "$service_file" "${service_file}.backup.$(date +%Y%m%d_%H%M%S)"
+    fi
+    
+    print_status "Creating apps-only subdomain service..."
+    
+    mkdir -p services
+    
+    cat > "$service_file" <<'EOF'
+const crypto = require('crypto');
+const App = require('../models/App');
+
+class SubdomainService {
+  constructor() {
+    this.baseLength = 6; // Length of random subdomain
+    this.maxRetries = 15; // Max attempts to generate unique subdomain
+    this.reservedSubdomains = [
+      'www', 'mail', 'ftp', 'ssh', 'admin', 'api', 'staging', 'dev', 'test',
+      'blog', 'shop', 'store', 'app', 'portal', 'dashboard', 'control', 'manage',
+      'system', 'root', 'secure', 'ssl', 'cdn', 'static', 'assets', 'media',
+      'files', 'docs', 'support', 'help', 'status', 'monitor', 'health'
+    ];
+  }
+
+  // Generate a random subdomain for apps
+  generateRandomSubdomain() {
+    const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    
+    // Start with a letter to ensure valid subdomain
+    result += characters.charAt(Math.floor(Math.random() * 26));
+    
+    // Add random characters
+    for (let i = 1; i < this.baseLength; i++) {
+      result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    
+    return result;
+  }
+
+  // Generate subdomain based on app name (with fallback to random)
+  generateSubdomainFromName(appName, userId) {
+    // Clean app name: lowercase, remove special chars, limit length
+    let subdomain = appName
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .substring(0, 10);
+    
+    // If empty after cleaning, use random
+    if (!subdomain || subdomain.length < 3) {
+      return this.generateRandomSubdomain();
+    }
+    
+    // Check if it's a reserved subdomain
+    if (this.reservedSubdomains.includes(subdomain)) {
+      // Add suffix to make it unique
+      const userSuffix = userId.toString().slice(-3);
+      subdomain = `${subdomain}${userSuffix}`;
+    }
+    
+    return subdomain;
+  }
+
+  // Check if subdomain is available and not reserved
+  async isSubdomainAvailable(subdomain) {
+    try {
+      // Check if it's reserved
+      if (this.reservedSubdomains.includes(subdomain.toLowerCase())) {
+        return false;
+      }
+      
+      // Check if already exists in database
+      const existingApp = await App.findOne({ subdomain });
+      return !existingApp;
+    } catch (error) {
+      console.error('Error checking subdomain availability:', error);
+      return false;
+    }
+  }
+
+  // Generate unique subdomain for an app
+  async generateUniqueSubdomain(appName, userId) {
+    let attempts = 0;
+    
+    while (attempts < this.maxRetries) {
+      let subdomain;
+      
+      if (attempts === 0) {
+        // First attempt: use app name
+        subdomain = this.generateSubdomainFromName(appName, userId);
+      } else if (attempts < 5) {
+        // Next few attempts: app name with random suffix
+        const baseName = appName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 6);
+        const randomSuffix = Math.random().toString(36).substring(2, 5);
+        subdomain = baseName ? `${baseName}${randomSuffix}` : this.generateRandomSubdomain();
+      } else {
+        // Remaining attempts: fully random
+        subdomain = this.generateRandomSubdomain();
+      }
+      
+      const isAvailable = await this.isSubdomainAvailable(subdomain);
+      
+      if (isAvailable && this.isValidSubdomain(subdomain)) {
+        return subdomain;
+      }
+      
+      attempts++;
+    }
+    
+    // If all attempts failed, use timestamp-based fallback
+    const timestamp = Date.now().toString().slice(-6);
+    return `app${timestamp}`;
+  }
+
+  // Generate full URL from subdomain (apps only)
+  generateSubdomainUrl(subdomain) {
+    const baseDomain = process.env.BASE_DOMAIN;
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    
+    if (!baseDomain) {
+      throw new Error('BASE_DOMAIN environment variable not set');
+    }
+    
+    return `${protocol}://${subdomain}.${baseDomain}`;
+  }
+
+  // Validate subdomain format for apps
+  isValidSubdomain(subdomain) {
+    // App subdomain rules:
+    // - 3-20 characters
+    // - Start and end with letter or number
+    // - Can contain letters, numbers, hyphens
+    // - Cannot be reserved
+    const subdomainRegex = /^[a-z0-9][a-z0-9-]{1,18}[a-z0-9]$|^[a-z0-9]{3}$/;
+    
+    if (!subdomainRegex.test(subdomain)) {
+      return false;
+    }
+    
+    // Check against reserved list
+    if (this.reservedSubdomains.includes(subdomain.toLowerCase())) {
+      return false;
+    }
+    
+    return true;
+  }
+
+  // Reserve a subdomain for an app
+  async reserveSubdomain(appName, userId) {
+    try {
+      const subdomain = await this.generateUniqueSubdomain(appName, userId);
+      
+      if (!this.isValidSubdomain(subdomain)) {
+        throw new Error('Generated subdomain is invalid');
+      }
+      
+      return {
+        subdomain,
+        url: this.generateSubdomainUrl(subdomain)
+      };
+    } catch (error) {
+      console.error('Error reserving subdomain:', error);
+      throw new Error('Failed to generate unique subdomain');
+    }
+  }
+
+  // Get list of reserved subdomains
+  getReservedSubdomains() {
+    return [...this.reservedSubdomains];
+  }
+}
+
+module.exports = new SubdomainService();
+EOF
+
+    print_success "Apps-only subdomain service created: $service_file"
+}
+
+# Function to create proxy route (same as before but with better error handling)
+create_proxy_route() {
+    local route_file="routes/proxy.js"
+    
+    if [ -f "$route_file" ]; then
+        print_warning "Proxy route already exists, creating apps-only version..."
+        cp "$route_file" "${route_file}.backup.$(date +%Y%m%d_%H%M%S)"
+    fi
+    
+    print_status "Creating apps-only proxy route..."
+    
+    mkdir -p routes
+    
+    cat > "$route_file" <<'EOF'
+const express = require('express');
+const { createProxyMiddleware } = require('http-proxy-middleware');
+const App = require('../models/App');
+const router = express.Router();
+
+// Middleware to log proxy requests for apps
+router.use((req, res, next) => {
+  console.log(`App Proxy request: ${req.method} ${req.originalUrl} from ${req.ip}`);
+  next();
+});
+
+// Proxy route for app subdomains ONLY
+router.use('/:subdomain', async (req, res, next) => {
+  try {
+    const subdomain = req.params.subdomain;
+    
+    // Validate subdomain format (stricter for apps)
+    if (!/^[a-z0-9][a-z0-9-]{1,18}[a-z0-9]$|^[a-z0-9]{3}$/.test(subdomain)) {
+      return res.status(400).send(`
+        <html>
+          <head><title>Invalid App Subdomain</title></head>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5;">
+            <div style="max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+              <h1 style="color: #e74c3c;">❌ Invalid App Subdomain</h1>
+              <p style="color: #666;">The subdomain "${subdomain}" is not a valid app subdomain format.</p>
+              <p style="color: #666; font-size: 14px;">App subdomains must be 3-20 characters, alphanumeric with hyphens allowed.</p>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+    
+    // Find app by subdomain
+    const app = await App.findOne({ 
+      subdomain, 
+      'deployment.status': 'running' 
+    });
+    
+    if (!app) {
+      return res.status(404).send(`
+        <html>
+          <head><title>App Not Found</title></head>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5;">
+            <div style="max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+              <h1 style="color: #e74c3c;">🔍 App Not Found</h1>
+              <p style="color: #666;">The app <strong>"${subdomain}"</strong> is not found or not running.</p>
+              <p style="color: #888; font-size: 14px;">This could mean:</p>
+              <ul style="text-align: left; color: #666; font-size: 14px;">
+                <li>The app doesn't exist</li>
+                <li>The app is stopped</li>
+                <li>The app is still deploying</li>
+                <li>The app has failed to start</li>
+              </ul>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+    
+    // Create proxy to the app's port
+    const proxy = createProxyMiddleware({
+      target: `http://localhost:${app.configuration.port}`,
+      changeOrigin: true,
+      pathRewrite: {
+        [`^/proxy/${subdomain}`]: '',
+      },
+      onError: (err, req, res) => {
+        console.error(`Proxy error for app ${subdomain} (port ${app.configuration.port}):`, err.message);
+        res.status(502).send(`
+          <html>
+            <head><title>App Unavailable</title></head>
+            <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5;">
+              <div style="max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <h1 style="color: #f39c12;">⚠️ App Unavailable</h1>
+                <p style="color: #666;">The app <strong>"${subdomain}"</strong> is temporarily unavailable.</p>
+                <p style="color: #888; font-size: 14px;">Technical details: ${err.message}</p>
+                <p style="color: #666; font-size: 14px;">Please try again in a few moments.</p>
+              </div>
+            </body>
+          </html>
+        `);
+      },
+      onProxyReq: (proxyReq, req, res) => {
+        // Add custom headers for app identification
+        proxyReq.setHeader('X-Forwarded-Subdomain', subdomain);
+        proxyReq.setHeader('X-DeployIT-App-Proxy', 'true');
+        proxyReq.setHeader('X-App-Name', app.name);
+        proxyReq.setHeader('X-App-ID', app._id.toString());
+      },
+      onProxyRes: (proxyRes, req, res) => {
+        // Add headers to identify this came through DeployIT
+        proxyRes.headers['X-Powered-By'] = 'DeployIT-Platform';
+        proxyRes.headers['X-App-Subdomain'] = subdomain;
+      }
+    });
+    
+    proxy(req, res, next);
+  } catch (error) {
+    console.error('App proxy route error:', error);
+    res.status(500).send(`
+      <html>
+        <head><title>Proxy Error</title></head>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5;">
+          <div style="max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <h1 style="color: #e74c3c;">🚨 Proxy Error</h1>
+            <p style="color: #666;">An error occurred while routing to the app.</p>
+            <p style="color: #888; font-size: 14px;">Please contact support if this persists.</p>
+          </div>
+        </body>
+      </html>
+    `);
+  }
+});
+
+module.exports = router;
+EOF
+
+    print_success "Apps-only proxy route created: $route_file"
+}
+
+# Function to display DNS configuration instructions (apps only)
+show_dns_instructions() {
+    local domain="$1"
+    local server_ip="$2"
+    
+    echo ""
+    print_success "=== APPS-ONLY SUBDOMAIN SETUP COMPLETED ==="
+    echo ""
+    print_warning "IMPORTANT: Configure this DNS record in Namecheap:"
+    echo ""
+    echo "┌─────────────────────────────────────────────────────────┐"
+    echo "│               DNS RECORD FOR APP SUBDOMAINS            │"
+    echo "├─────────────────────────────────────────────────────────┤"
+    echo "│ Type: A Record                                          │"
+    echo "│ Host: *                                                 │"
+    echo "│ Value: $server_ip                                       │"
+    echo "│ TTL: Automatic                                          │"
+    echo "└─────────────────────────────────────────────────────────┘"
+    echo ""
+    print_status "This wildcard record (*) will route ALL subdomains to your server."
+    print_warning "Your main site subdomain routing is NOT affected by this setup."
+    echo ""
+    print_status "After DNS propagation (5-30 minutes), your app URLs will be:"
+    echo "  • App subdomains: http://myapp123.$domain"
+    echo "  • Another app: http://blog456.$domain"
+    echo "  • Random app: http://x7k9m2.$domain"
+    echo ""
+    print_status "Reserved subdomains that WON'T be used for apps:"
+    echo "  www, mail, ftp, ssh, admin, api, staging, dev, test, blog,"
+    echo "  shop, store, app, portal, dashboard, control, manage, etc."
+    echo ""
+    print_status "Test DNS propagation with:"
+    echo "  nslookup test123.$domain"
+    echo ""
+}
+
+# Function to restart services
+restart_services() {
+    print_status "Restarting application services..."
+    
+    # Check if PM2 is running the main app
+    if pm2 list | grep -q "deployit-app"; then
+        pm2 restart deployit-app
+        print_success "DeployIT app restarted"
+    else
+        print_warning "DeployIT app not found in PM2. Please start it manually."
+    fi
+    
+    # Save PM2 processes
+    pm2 save
+    print_success "PM2 processes saved"
+}
+
+# Main script execution
+main() {
+    echo ""
+    echo "🎯 DeployIT Platform - Apps-Only Subdomain Setup"
+    echo "=============================================="
+    echo ""
+    
+    # Check if domain is provided
+    if [ $# -eq 0 ]; then
+        print_error "Usage: $0 <domain.com>"
+        print_error "Example: $0 mydomain.com"
+        print_error ""
+        print_status "This script sets up subdomain routing ONLY for deployed apps."
+        print_status "Your main site routing will remain unchanged."
+        exit 1
+    fi
+    
+    local domain="$1"
+    
+    # Validate domain format
+    if ! validate_domain "$domain"; then
+        print_error "Invalid domain format: $domain"
+        print_error "Please provide a valid domain (e.g., mydomain.com)"
+        exit 1
+    fi
+    
+    print_status "Setting up app subdomains for: $domain"
+    print_warning "Main domain routing will NOT be affected"
+    
+    # Check if running as root for nginx operations
+    if [ "$EUID" -ne 0 ]; then
+        print_error "This script requires sudo privileges for Nginx configuration"
+        print_error "Please run: sudo $0 $domain"
+        exit 1
+    fi
+    
+    # Check required commands
+    local missing_commands=()
+    
+    if ! command_exists nginx; then
+        missing_commands+=("nginx")
+    fi
+    
+    if ! command_exists npm; then
+        missing_commands+=("npm")
+    fi
+    
+    if ! command_exists pm2; then
+        missing_commands+=("pm2")
+    fi
+    
+    if [ ${#missing_commands[@]} -ne 0 ]; then
+        print_error "Missing required commands: ${missing_commands[*]}"
+        print_error "Please install them first"
+        exit 1
+    fi
+    
+    # Get server IP
+    local server_ip
+    server_ip=$(get_server_ip)
+    
+    if [ -z "$server_ip" ]; then
+        print_error "Could not determine server IP address"
+        exit 1
+    fi
+    
+    print_status "Server IP detected: $server_ip"
+    
+    # Execute setup steps
+    backup_nginx_config "$domain"
+    create_nginx_config "$domain"
+    enable_nginx_site "$domain"
+    reload_nginx
+    
+    # Switch to non-root user for Node.js operations
+    local original_user="${SUDO_USER:-$USER}"
+    if [ "$original_user" != "root" ]; then
+        print_status "Switching to user: $original_user"
+        
+        # Update environment as original user
+        sudo -u "$original_user" bash -c "$(declare -f update_env_file print_status print_success); update_env_file '$domain'"
+        
+        # Install dependencies as original user
+        sudo -u "$original_user" bash -c "$(declare -f install_dependencies print_status print_success print_error); install_dependencies"
+        
+        # Create service files as original user
+        sudo -u "$original_user" bash -c "$(declare -f create_subdomain_service print_status print_success print_warning); create_subdomain_service"
+        sudo -u "$original_user" bash -c "$(declare -f create_proxy_route print_status print_success print_warning); create_proxy_route"
+        
+        # Restart services as original user
+        sudo -u "$original_user" bash -c "$(declare -f restart_services print_status print_success print_warning); restart_services"
+    else
+        update_env_file "$domain"
+        install_dependencies
+        create_subdomain_service
+        create_proxy_route
+        restart_services
+    fi
+    
+    # Show DNS instructions
+    show_dns_instructions "$domain" "$server_ip"
+    
+    print_success "Apps-only subdomain setup completed successfully!"
+    print_status "Only deployed apps will get subdomains - main site unaffected!"
+}
+
+# Run main function with all arguments
+main "$@" 

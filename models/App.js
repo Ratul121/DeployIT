@@ -112,6 +112,19 @@ const appSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  subdomain: {
+    type: String,
+    unique: true,
+    sparse: true, // Allows null values but ensures uniqueness for non-null values
+    validate: {
+      validator: function(v) {
+        if (!v) return true; // Allow null/undefined
+        // Validate subdomain format: 3-20 chars, alphanumeric + hyphens, start/end with alphanumeric
+        return /^[a-z0-9][a-z0-9-]{1,18}[a-z0-9]$|^[a-z0-9]{3}$/.test(v);
+      },
+      message: 'Subdomain must be 3-20 characters, alphanumeric with hyphens, starting and ending with alphanumeric'
+    }
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -123,5 +136,6 @@ const appSchema = new mongoose.Schema({
 // Index for efficient queries
 appSchema.index({ userId: 1, createdAt: -1 });
 appSchema.index({ 'deployment.status': 1 });
+appSchema.index({ subdomain: 1 });
 
 module.exports = mongoose.model('App', appSchema); 

@@ -148,6 +148,12 @@
                                                     <i class="fab fa-github mr-2"></i>
                                                     <%= app.repository.fullName %>
                                                 </span>
+                                                <% if (app.subdomain) { %>
+                                                    <span class="flex items-center">
+                                                        <i class="fas fa-globe mr-2"></i>
+                                                        <%= app.subdomain %>
+                                                    </span>
+                                                <% } %>
                                                 <span class="flex items-center">
                                                     <i class="fas fa-clock mr-2"></i>
                                                     <%= app.createdAt.toLocaleDateString() %>

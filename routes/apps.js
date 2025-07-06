@@ -89,6 +89,20 @@ router.post('/', [
     // Get available port
     const port = await deploymentService.getAvailablePort();
     
+    // Generate subdomain if BASE_DOMAIN is configured
+    let subdomain = null;
+    if (process.env.BASE_DOMAIN) {
+      try {
+        const subdomainService = require('../services/subdomain');
+        const subdomainResult = await subdomainService.reserveSubdomain(name, req.user._id);
+        subdomain = subdomainResult.subdomain;
+        console.log(`Generated subdomain for app "${name}": ${subdomain}`);
+      } catch (error) {
+        console.error('Error generating subdomain:', error);
+        // Continue without subdomain if generation fails
+      }
+    }
+    
     // Parse environment variables
     let envVars = new Map();
     if (environmentVariables && environmentVariables.trim()) {
@@ -128,7 +142,8 @@ router.post('/', [
         buildCommand: buildCommand || 'npm install',
         environmentVariables: envVars,
         port
-      }
+      },
+      subdomain
     });
 
     await app.save();

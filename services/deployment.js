@@ -184,9 +184,16 @@ class DeploymentService {
       app.deployment.deployedAt = new Date();
       app.deployment.lastDeployment = new Date();
       app.deployment.deploymentCount += 1;
-      // Generate app URL using APPS_BASE_URL (preferred) or fallback to BASE_URL
-      // Format: APPS_BASE_URL:assigned_port (e.g., http://localhost:4000)
-      app.url = `${process.env.APPS_BASE_URL || process.env.BASE_URL.replace(':3000', '')}:${app.configuration.port}`;
+      
+      // Generate app URL - prioritize subdomain if available
+      if (app.subdomain && process.env.BASE_DOMAIN) {
+        const subdomainService = require('./subdomain');
+        app.url = subdomainService.generateSubdomainUrl(app.subdomain);
+      } else {
+        // Fallback to port-based URL
+        app.url = `${process.env.APPS_BASE_URL || process.env.BASE_URL.replace(':3000', '')}:${app.configuration.port}`;
+      }
+      
       await app.save();
 
       socketService.emitDeploymentStatus(appId, 'success');

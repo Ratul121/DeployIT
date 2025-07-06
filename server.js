@@ -23,6 +23,16 @@ const dashboardRoutes = require('./routes/dashboard');
 const appRoutes = require('./routes/apps');
 const repoRoutes = require('./routes/repos');
 
+// Conditionally import proxy route if BASE_DOMAIN is configured
+let proxyRoutes = null;
+if (process.env.BASE_DOMAIN) {
+  try {
+    proxyRoutes = require('./routes/proxy');
+  } catch (error) {
+    console.warn('Proxy route not available - subdomain functionality disabled');
+  }
+}
+
 // Import services
 const database = require('./services/database');
 const socketService = require('./services/socket');
@@ -104,6 +114,11 @@ app.use('/auth', authRoutes);
 app.use('/dashboard', authMiddleware.requireAuth, dashboardRoutes);
 app.use('/apps', authMiddleware.requireAuth, appRoutes);
 app.use('/repos', authMiddleware.requireAuth, repoRoutes);
+
+// Proxy route for app subdomains (if configured)
+if (proxyRoutes) {
+  app.use('/proxy', proxyRoutes);
+}
 
 // Home route
 app.get('/', (req, res) => {
