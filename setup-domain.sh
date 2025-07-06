@@ -84,24 +84,20 @@ server {
     add_header X-XSS-Protection "1; mode=block" always;
     add_header X-Content-Type-Options "nosniff" always;
     
-    # Rate limiting for app subdomains
-    limit_req_zone \$binary_remote_addr zone=app_subdomain_limit:10m rate=20r/s;
-    limit_req zone=app_subdomain_limit burst=50 nodelay;
-    
     location / {
         # Extract subdomain
         set \$subdomain "";
-        if (\$host ~* "^(.+)\.$domain\$") {
+        if (\$host ~* "^(.+)\\.$domain\$") {
             set \$subdomain \$1;
         }
         
         # Block reserved/system subdomains
-        if (\$subdomain ~* "^(www|mail|ftp|ssh|admin|api|staging|dev|test|blog|shop|store|app|portal|dashboard|control|manage|system|root|secure|ssl|cdn|static|assets|media|files|docs|support|help|status|monitor|health)$") {
+        if (\$subdomain ~* "^(www|mail|ftp|ssh|admin|api|staging|dev|test|blog|shop|store|app|portal|dashboard|control|manage|system|root|secure|ssl|cdn|static|assets|media|files|docs|support|help|status|monitor|health)\$") {
             return 403 "Reserved subdomain - cannot be used for apps";
         }
         
         # Only allow app subdomains (alphanumeric + hyphen, 3-20 chars)
-        if (\$subdomain !~ "^[a-z0-9][a-z0-9-]{1,18}[a-z0-9]$") {
+        if (\$subdomain !~ "^[a-z0-9][a-z0-9-]{1,18}[a-z0-9]\$") {
             return 400 "Invalid app subdomain format";
         }
         
@@ -147,14 +143,12 @@ server {
         .container { max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { color: #e74c3c; margin-bottom: 20px; }
         p { color: #666; line-height: 1.6; }
-        .subdomain { color: #3498db; font-weight: bold; }
-        .btn { display: inline-block; margin-top: 20px; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🚫 App Unavailable</h1>
-        <p>The app <span class="subdomain">"'\$subdomain'"</span> is currently unavailable.</p>
+        <p>The requested app subdomain is currently unavailable.</p>
         <p>This could be because:</p>
         <ul style="text-align: left; color: #666;">
             <li>The app is starting up</li>
