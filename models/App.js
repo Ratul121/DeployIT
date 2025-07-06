@@ -136,6 +136,6 @@ const appSchema = new mongoose.Schema({
 // Index for efficient queries
 appSchema.index({ userId: 1, createdAt: -1 });
 appSchema.index({ 'deployment.status': 1 });
-appSchema.index({ subdomain: 1 });
+// Note: subdomain index is created automatically by the 'unique: true' option
 
 module.exports = mongoose.model('App', appSchema); 

@@ -45,6 +45,10 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
+// Trust proxy - required when behind reverse proxy (Nginx, Cloudflare, etc.)
+// This fixes the X-Forwarded-For header issue with rate limiting
+app.set('trust proxy', true);
+
 // Connect to database
 database.connect();
 
