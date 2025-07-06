@@ -39,10 +39,67 @@ class DeploymentService {
           resolve();
         } else {
           console.log('Connected to PM2');
+          
+          // Try to resurrect processes from dump file
+          this.resurrectPM2Processes();
+          
           resolve();
         }
       });
     });
+  }
+
+  // Resurrect PM2 processes from dump file
+  async resurrectPM2Processes() {
+    return new Promise((resolve) => {
+      pm2.resurrect((err) => {
+        if (err) {
+          console.log('No PM2 dump file found or error resurrecting processes:', err.message);
+        } else {
+          console.log('PM2 processes resurrected from dump file');
+          
+          // Update app statuses in database based on actual PM2 status
+          this.syncAppStatusesWithPM2();
+        }
+        resolve();
+      });
+    });
+  }
+
+  // Sync app statuses with actual PM2 process statuses
+  async syncAppStatusesWithPM2() {
+    try {
+      const apps = await App.find({ 'deployment.pm2Id': { $ne: null } });
+      
+      for (const app of apps) {
+        pm2.describe(app.deployment.pm2Id, async (err, processDescription) => {
+          if (err || !processDescription || processDescription.length === 0) {
+            // Process not found in PM2, mark as stopped
+            app.deployment.status = 'stopped';
+            await app.save();
+            console.log(`App ${app.name} marked as stopped (not found in PM2)`);
+          } else {
+            const process = processDescription[0];
+            const pm2Status = process.pm2_env.status;
+            
+            let appStatus = 'stopped';
+            if (pm2Status === 'online') {
+              appStatus = 'running';
+            } else if (pm2Status === 'errored') {
+              appStatus = 'failed';
+            }
+            
+            if (app.deployment.status !== appStatus) {
+              app.deployment.status = appStatus;
+              await app.save();
+              console.log(`App ${app.name} status synced: ${appStatus}`);
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error syncing app statuses with PM2:', error);
+    }
   }
 
   // Get available port
@@ -359,10 +416,20 @@ class DeploymentService {
                     if (status === 'errored' || status === 'stopped') {
                       await this.addDeploymentLog(deployment, 'error', `Process status: ${status}`);
                       reject(new Error(`Process is in ${status} state`));
-                    } else {
-                      await this.addDeploymentLog(deployment, 'info', `Process is running with status: ${status}`);
-                      resolve();
-                    }
+                                         } else {
+                       await this.addDeploymentLog(deployment, 'info', `Process is running with status: ${status}`);
+                       
+                       // Save PM2 process list for persistence
+                       pm2.dump((dumpErr) => {
+                         if (dumpErr) {
+                           console.error('Error saving PM2 dump:', dumpErr);
+                         } else {
+                           console.log('PM2 process list saved for persistence');
+                         }
+                       });
+                       
+                       resolve();
+                     }
                   }
                 });
               }, 2000);
@@ -386,6 +453,15 @@ class DeploymentService {
       // Update app status
       app.deployment.status = 'stopped';
       await app.save();
+      
+      // Save PM2 process list for persistence
+      pm2.dump((dumpErr) => {
+        if (dumpErr) {
+          console.error('Error saving PM2 dump:', dumpErr);
+        } else {
+          console.log('PM2 process list saved for persistence');
+        }
+      });
       
       socketService.emitAppStatus(appId, 'stopped');
       
@@ -426,6 +502,16 @@ class DeploymentService {
           } else {
             app.deployment.status = 'running';
             app.save();
+            
+            // Save PM2 process list for persistence
+            pm2.dump((dumpErr) => {
+              if (dumpErr) {
+                console.error('Error saving PM2 dump:', dumpErr);
+              } else {
+                console.log('PM2 process list saved for persistence');
+              }
+            });
+            
             socketService.emitAppStatus(appId, 'running');
             resolve();
           }
@@ -468,6 +554,15 @@ class DeploymentService {
       // Remove from database
       await App.findByIdAndDelete(appId);
       await Deployment.deleteMany({ appId });
+
+      // Save PM2 process list for persistence
+      pm2.dump((dumpErr) => {
+        if (dumpErr) {
+          console.error('Error saving PM2 dump:', dumpErr);
+        } else {
+          console.log('PM2 process list saved for persistence');
+        }
+      });
 
       return { success: true };
     } catch (error) {
