@@ -168,7 +168,15 @@
                                         </div>
                                     </div>
                                     <div class="flex items-center space-x-3">
-                                        <% if (app.url) { %>
+                                        <% if (app.subdomain && process.env.BASE_DOMAIN) { %>
+                                            <% 
+                                                const protocol = process.env.APPS_SSL_ENABLED === 'true' ? 'https' : 'http';
+                                                const dashboardSubdomainUrl = `${protocol}://${app.subdomain}.${process.env.BASE_DOMAIN}`;
+                                            %>
+                                            <a href="<%= dashboardSubdomainUrl %>" target="_blank" class="text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50 transition-colors" onclick="event.stopPropagation()">
+                                                <i class="fas fa-external-link-alt"></i>
+                                            </a>
+                                        <% } else if (app.url) { %>
                                             <a href="<%= app.url %>" target="_blank" class="text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50 transition-colors" onclick="event.stopPropagation()">
                                                 <i class="fas fa-external-link-alt"></i>
                                             </a>

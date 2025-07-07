@@ -178,7 +178,16 @@
                             <% } %>
                             <%= app.deployment.status %>
                         </span>
-                        <% if (app.url) { %>
+                        <% if (app.subdomain && process.env.BASE_DOMAIN) { %>
+                            <% 
+                                const protocol = process.env.APPS_SSL_ENABLED === 'true' ? 'https' : 'http';
+                                const subdomainUrl = `${protocol}://${app.subdomain}.${process.env.BASE_DOMAIN}`;
+                            %>
+                            <a href="<%= subdomainUrl %>" target="_blank" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                                <i class="fas fa-external-link-alt mr-1"></i>
+                                Visit App
+                            </a>
+                        <% } else if (app.url) { %>
                             <a href="<%= app.url %>" target="_blank" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
                                 <i class="fas fa-external-link-alt mr-1"></i>
                                 Visit App
@@ -351,24 +360,36 @@
                         <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2"><%= app.configuration.port %></dd>
                     </div>
                     <% if (app.subdomain) { %>
-                    <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-500">Subdomain</dt>
+                    <div class="bg-green-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 border border-green-200 rounded-lg">
+                        <dt class="text-sm font-medium text-green-700">App Subdomain</dt>
                         <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                            <div class="flex items-center space-x-2">
-                                <code class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-mono">
+                            <div class="flex items-center space-x-3">
+                                <code class="bg-green-100 text-green-800 px-3 py-2 rounded-lg text-sm font-mono">
                                     <%= app.subdomain %>
                                 </code>
-                                <% if (app.url && app.url.includes(app.subdomain)) { %>
-                                <a href="<%= app.url %>" target="_blank" class="text-blue-600 hover:text-blue-800 text-sm">
+                                <% if (process.env.BASE_DOMAIN) { %>
+                                <% 
+                                    const protocol = process.env.APPS_SSL_ENABLED === 'true' ? 'https' : 'http';
+                                    const fullSubdomainUrl = `${protocol}://${app.subdomain}.${process.env.BASE_DOMAIN}`;
+                                %>
+                                <a href="<%= fullSubdomainUrl %>" target="_blank" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm font-medium">
                                     <i class="fas fa-external-link-alt mr-1"></i>
-                                    Visit
+                                    Visit Subdomain
                                 </a>
                                 <% } %>
                             </div>
                             <% if (process.env.BASE_DOMAIN) { %>
-                            <p class="text-xs text-gray-500 mt-1">
-                                Accessible at: <%= app.subdomain %>.<%= process.env.BASE_DOMAIN %>
-                            </p>
+                            <div class="mt-2 p-3 bg-white rounded border">
+                                <p class="text-sm font-medium text-gray-700">Full URL:</p>
+                                <% 
+                                    const protocol = process.env.APPS_SSL_ENABLED === 'true' ? 'https' : 'http';
+                                    const fullUrl = `${protocol}://${app.subdomain}.${process.env.BASE_DOMAIN}`;
+                                %>
+                                <code class="text-blue-600 font-mono text-sm break-all"><%= fullUrl %></code>
+                                <button onclick="navigator.clipboard.writeText('<%= fullUrl %>')" class="ml-2 text-gray-500 hover:text-gray-700" title="Copy URL">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
                             <% } %>
                         </dd>
                     </div>
