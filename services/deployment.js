@@ -540,12 +540,28 @@ class DeploymentService {
         throw new Error('App not found');
       }
 
+      console.log(`Starting deletion process for app: ${app.name} (ID: ${appId})`);
+
+      // Release subdomain if it exists
+      if (app.subdomain) {
+        try {
+          const subdomainService = require('./subdomain');
+          await subdomainService.releaseSubdomain(app.subdomain);
+          console.log(`Subdomain ${app.subdomain} released for app ${app.name}`);
+        } catch (subdomainError) {
+          console.error('Error releasing subdomain:', subdomainError);
+          // Continue with deletion even if subdomain release fails
+        }
+      }
+
       // Stop PM2 process if running
       if (app.deployment.pm2Id) {
         await new Promise((resolve, reject) => {
           pm2.delete(app.deployment.pm2Id, (err) => {
             if (err) {
               console.error('Error deleting PM2 process:', err);
+            } else {
+              console.log(`PM2 process ${app.deployment.pm2Id} deleted for app ${app.name}`);
             }
             resolve();
           });
@@ -556,13 +572,17 @@ class DeploymentService {
       const appDir = path.join(this.deploymentDir, app._id.toString());
       try {
         await fs.rm(appDir, { recursive: true, force: true });
+        console.log(`Deployment directory removed for app ${app.name}`);
       } catch (error) {
         console.error('Error removing deployment directory:', error);
       }
 
-      // Remove from database
+      // Remove from database - this will automatically release the subdomain 
+      // due to the unique constraint and sparse index
       await App.findByIdAndDelete(appId);
       await Deployment.deleteMany({ appId });
+      
+      console.log(`App ${app.name} and related deployments removed from database`);
 
       // Save PM2 process list for persistence
       pm2.dump((dumpErr) => {
@@ -573,6 +593,7 @@ class DeploymentService {
         }
       });
 
+      console.log(`App deletion completed successfully for: ${app.name}`);
       return { success: true };
     } catch (error) {
       console.error('Error deleting app:', error);

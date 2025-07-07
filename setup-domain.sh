@@ -560,7 +560,12 @@ create_subdomain_service() {
     local service_file="services/subdomain.js"
     
     if [ -f "$service_file" ]; then
-        print_warning "Subdomain service already exists, creating apps-only version..."
+        # Check if the file already has the improved NAME-5digits format
+        if grep -q "generate5DigitNumber" "$service_file" && grep -q "releaseSubdomain" "$service_file"; then
+            print_success "Subdomain service already exists with NAME-5digits format - skipping creation"
+            return 0
+        fi
+        print_warning "Subdomain service already exists, creating improved NAME-5digits version..."
         cp "$service_file" "${service_file}.backup.$(date +%Y%m%d_%H%M%S)"
     fi
     
@@ -574,7 +579,6 @@ const App = require('../models/App');
 
 class SubdomainService {
   constructor() {
-    this.baseLength = 6; // Length of random subdomain
     this.maxRetries = 15; // Max attempts to generate unique subdomain
     this.reservedSubdomains = [
       'www', 'mail', 'ftp', 'ssh', 'admin', 'api', 'staging', 'dev', 'test',
@@ -584,41 +588,29 @@ class SubdomainService {
     ];
   }
 
-  // Generate a random subdomain for apps
-  generateRandomSubdomain() {
-    const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    
-    // Start with a letter to ensure valid subdomain
-    result += characters.charAt(Math.floor(Math.random() * 26));
-    
-    // Add random characters
-    for (let i = 1; i < this.baseLength; i++) {
-      result += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    
-    return result;
+  // Generate a 5-digit random number
+  generate5DigitNumber() {
+    return Math.floor(10000 + Math.random() * 90000).toString();
   }
 
-  // Generate subdomain based on app name (with fallback to random)
-  generateSubdomainFromName(appName, userId) {
+  // Generate subdomain in format: NAME-5digits
+  generateSubdomainFromName(appName) {
     // Clean app name: lowercase, remove special chars, limit length
-    let subdomain = appName
+    let cleanName = appName
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '')
-      .substring(0, 10);
+      .substring(0, 10); // Limit to 10 chars to leave room for -5digits
     
-    // If empty after cleaning, use random
-    if (!subdomain || subdomain.length < 3) {
-      return this.generateRandomSubdomain();
+    // If empty after cleaning, use 'app' as default
+    if (!cleanName || cleanName.length < 2) {
+      cleanName = 'app';
     }
     
-    // Check if it's a reserved subdomain
-    if (this.reservedSubdomains.includes(subdomain)) {
-      // Add suffix to make it unique
-      const userSuffix = userId.toString().slice(-3);
-      subdomain = \`\${subdomain}\${userSuffix}\`;
-    }
+    // Generate 5-digit random number
+    const randomNumber = this.generate5DigitNumber();
+    
+    // Combine: name-5digits
+    const subdomain = \`\${cleanName}-\${randomNumber}\`;
     
     return subdomain;
   }
@@ -640,25 +632,13 @@ class SubdomainService {
     }
   }
 
-  // Generate unique subdomain for an app
+  // Generate unique subdomain for an app in format NAME-5digits
   async generateUniqueSubdomain(appName, userId) {
     let attempts = 0;
     
     while (attempts < this.maxRetries) {
-      let subdomain;
-      
-      if (attempts === 0) {
-        // First attempt: use app name
-        subdomain = this.generateSubdomainFromName(appName, userId);
-      } else if (attempts < 5) {
-        // Next few attempts: app name with random suffix
-        const baseName = appName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 6);
-        const randomSuffix = Math.random().toString(36).substring(2, 5);
-        subdomain = baseName ? \`\${baseName}\${randomSuffix}\` : this.generateRandomSubdomain();
-      } else {
-        // Remaining attempts: fully random
-        subdomain = this.generateRandomSubdomain();
-      }
+      // Always use the NAME-5digits format
+      const subdomain = this.generateSubdomainFromName(appName);
       
       const isAvailable = await this.isSubdomainAvailable(subdomain);
       
@@ -669,9 +649,9 @@ class SubdomainService {
       attempts++;
     }
     
-    // If all attempts failed, use timestamp-based fallback
-    const timestamp = Date.now().toString().slice(-6);
-    return \`app\${timestamp}\`;
+    // If all attempts failed, use timestamp-based fallback with app prefix
+    const timestamp = Date.now().toString().slice(-5); // Last 5 digits
+    return \`app-\${timestamp}\`;
   }
 
   // Generate full URL from subdomain (with SSL support)
@@ -690,10 +670,11 @@ class SubdomainService {
   // Validate subdomain format for apps
   isValidSubdomain(subdomain) {
     // App subdomain rules:
-    // - 3-20 characters
+    // - 3-20 characters (to accommodate NAME-5digits format)
     // - Start and end with letter or number
     // - Can contain letters, numbers, hyphens
     // - Cannot be reserved
+    // - Should follow NAME-5digits pattern
     const subdomainRegex = /^[a-z0-9][a-z0-9-]{1,18}[a-z0-9]$|^[a-z0-9]{3}$/;
     
     if (!subdomainRegex.test(subdomain)) {
@@ -717,6 +698,8 @@ class SubdomainService {
         throw new Error('Generated subdomain is invalid');
       }
       
+      console.log(\`Reserved subdomain: \${subdomain} for app: \${appName}\`);
+      
       return {
         subdomain,
         url: this.generateSubdomainUrl(subdomain)
@@ -727,9 +710,44 @@ class SubdomainService {
     }
   }
 
+  // Release/cleanup subdomain when app is deleted
+  async releaseSubdomain(subdomain) {
+    try {
+      if (!subdomain) {
+        return true; // Nothing to release
+      }
+      
+      console.log(\`Releasing subdomain: \${subdomain}\`);
+      
+      // The subdomain is automatically released when the app is deleted from DB
+      // since it's tied to the app document. This function is for any additional
+      // cleanup that might be needed (like cache clearing, etc.)
+      
+      return true;
+    } catch (error) {
+      console.error('Error releasing subdomain:', error);
+      return false;
+    }
+  }
+
   // Get list of reserved subdomains
   getReservedSubdomains() {
     return [...this.reservedSubdomains];
+  }
+
+  // Get all active subdomains (for monitoring/debugging)
+  async getActiveSubdomains() {
+    try {
+      const apps = await App.find({ subdomain: { \$ne: null } }, 'name subdomain');
+      return apps.map(app => ({
+        name: app.name,
+        subdomain: app.subdomain,
+        url: this.generateSubdomainUrl(app.subdomain)
+      }));
+    } catch (error) {
+      console.error('Error fetching active subdomains:', error);
+      return [];
+    }
   }
 }
 
