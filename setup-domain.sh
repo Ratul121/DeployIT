@@ -125,7 +125,7 @@ server {
     }
 }
 
-# HTTPS server for app subdomains
+    # HTTPS server for app subdomains
 server {
     listen 443 ssl http2;
     server_name *.$domain;
@@ -162,8 +162,8 @@ server {
             return 403 "Reserved subdomain - cannot be used for apps";
         }
         
-        # Only allow app subdomains (alphanumeric + hyphen, 3-20 chars)
-        if (\$subdomain !~ "^[a-z0-9][a-z0-9-]{1,18}[a-z0-9]\$") {
+        # Only allow app subdomains (format: name-5digits, e.g., myapp-12345)
+        if (\$subdomain !~ "^[a-z0-9][a-z0-9-]*-[0-9]{5}\$") {
             return 400 "Invalid app subdomain format";
         }
         
@@ -282,8 +282,8 @@ server {
             return 403 "Reserved subdomain - cannot be used for apps";
         }
         
-        # Only allow app subdomains (alphanumeric + hyphen, 3-20 chars)
-        if (\$subdomain !~ "^[a-z0-9][a-z0-9-]{1,18}[a-z0-9]\$") {
+        # Only allow app subdomains (format: name-5digits, e.g., myapp-12345)
+        if (\$subdomain !~ "^[a-z0-9][a-z0-9-]*-[0-9]{5}\$") {
             return 400 "Invalid app subdomain format";
         }
         
@@ -600,24 +600,28 @@ class SubdomainService {
     return result;
   }
 
-  // Generate subdomain based on app name (with fallback to random)
+  // Generate subdomain based on app name with random 5-digit suffix
   generateSubdomainFromName(appName, userId) {
     // Clean app name: lowercase, remove special chars, limit length
-    let subdomain = appName
+    let baseName = appName
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '')
-      .substring(0, 10);
+      .substring(0, 8); // Reduced to 8 chars to make room for -5digits
     
-    // If empty after cleaning, use random
-    if (!subdomain || subdomain.length < 3) {
-      return this.generateRandomSubdomain();
+    // If empty after cleaning, use default base
+    if (!baseName || baseName.length < 2) {
+      baseName = 'app';
     }
     
-    // Check if it's a reserved subdomain
-    if (this.reservedSubdomains.includes(subdomain)) {
-      // Add suffix to make it unique
-      const userSuffix = userId.toString().slice(-3);
-      subdomain = \`\${subdomain}\${userSuffix}\`;
+    // Always append a random 5-digit number (10000-99999)
+    const random5Digits = Math.floor(Math.random() * 90000) + 10000;
+    let subdomain = `${baseName}-${random5Digits}`;
+    
+    // Check if it's a reserved subdomain base (without the digits)
+    if (this.reservedSubdomains.includes(baseName)) {
+      // Use 'app' as base instead and add user suffix
+      const userSuffix = userId.toString().slice(-2);
+      subdomain = `app${userSuffix}-${random5Digits}`;
     }
     
     return subdomain;
@@ -648,16 +652,19 @@ class SubdomainService {
       let subdomain;
       
       if (attempts === 0) {
-        // First attempt: use app name
+        // First attempt: use app name with random 5-digit number
         subdomain = this.generateSubdomainFromName(appName, userId);
-      } else if (attempts < 5) {
-        // Next few attempts: app name with random suffix
-        const baseName = appName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 6);
-        const randomSuffix = Math.random().toString(36).substring(2, 5);
-        subdomain = baseName ? \`\${baseName}\${randomSuffix}\` : this.generateRandomSubdomain();
+      } else if (attempts < 10) {
+        // Next attempts: app name with different random 5-digit numbers
+        const baseName = appName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 8);
+        const cleanBaseName = baseName || 'app';
+        const random5Digits = Math.floor(Math.random() * 90000) + 10000;
+        subdomain = `${cleanBaseName}-${random5Digits}`;
       } else {
-        // Remaining attempts: fully random
-        subdomain = this.generateRandomSubdomain();
+        // Final attempts: fully random base with 5-digit number
+        const randomBase = this.generateRandomSubdomain();
+        const random5Digits = Math.floor(Math.random() * 90000) + 10000;
+        subdomain = `${randomBase}-${random5Digits}`;
       }
       
       const isAvailable = await this.isSubdomainAvailable(subdomain);
@@ -669,9 +676,10 @@ class SubdomainService {
       attempts++;
     }
     
-    // If all attempts failed, use timestamp-based fallback
-    const timestamp = Date.now().toString().slice(-6);
-    return \`app\${timestamp}\`;
+    // If all attempts failed, use timestamp-based fallback with 5-digit number
+    const timestamp = Date.now().toString().slice(-4);
+    const random5Digits = Math.floor(Math.random() * 90000) + 10000;
+    return \`app\${timestamp}-\${random5Digits}\`;
   }
 
   // Generate full URL from subdomain (with SSL support)
@@ -690,18 +698,25 @@ class SubdomainService {
   // Validate subdomain format for apps
   isValidSubdomain(subdomain) {
     // App subdomain rules:
-    // - 3-20 characters
-    // - Start and end with letter or number
+    // - 8-20 characters
+    // - Format: name-5digits (e.g., myapp-12345, blog-67890)
+    // - Start with letter or number, end with 5 digits
     // - Can contain letters, numbers, hyphens
     // - Cannot be reserved
-    const subdomainRegex = /^[a-z0-9][a-z0-9-]{1,18}[a-z0-9]$|^[a-z0-9]{3}$/;
+    const subdomainRegex = /^[a-z0-9][a-z0-9-]*-[0-9]{5}$/;
     
     if (!subdomainRegex.test(subdomain)) {
       return false;
     }
     
-    // Check against reserved list
-    if (this.reservedSubdomains.includes(subdomain.toLowerCase())) {
+    // Check length
+    if (subdomain.length < 8 || subdomain.length > 20) {
+      return false;
+    }
+    
+    // Extract base name (before the last hyphen) for reserved check
+    const baseName = subdomain.includes('-') ? subdomain.split('-')[0] : subdomain;
+    if (this.reservedSubdomains.includes(baseName.toLowerCase())) {
       return false;
     }
     
@@ -769,8 +784,8 @@ router.use('/:subdomain', async (req, res, next) => {
   try {
     const subdomain = req.params.subdomain;
     
-    // Validate subdomain format (stricter for apps)
-    if (!/^[a-z0-9][a-z0-9-]{1,18}[a-z0-9]$|^[a-z0-9]{3}$/.test(subdomain)) {
+    // Validate subdomain format (format: name-5digits, e.g., myapp-12345)
+    if (!/^[a-z0-9][a-z0-9-]*-[0-9]{5}$/.test(subdomain)) {
       return res.status(400).send(`
         <html>
           <head><title>Invalid App Subdomain</title></head>
@@ -899,9 +914,9 @@ show_dns_instructions() {
     
     if [ "$has_ssl" = "true" ]; then
         print_status "After DNS propagation (5-30 minutes), your app URLs will be:"
-        echo "  • App subdomains: https://myapp123.$domain"
-        echo "  • Another app: https://blog456.$domain"
-        echo "  • Random app: https://x7k9m2.$domain"
+        echo "  • App subdomains: https://myapp-12345.$domain"
+        echo "  • Another app: https://blog-67890.$domain"
+        echo "  • Random app: https://x7k9m2-54321.$domain"
         echo ""
         print_status "SSL Features:"
         echo "  • ✅ Automatic HTTPS for all app subdomains"
@@ -911,9 +926,9 @@ show_dns_instructions() {
         echo "  • ✅ HTTP to HTTPS redirect"
     else
         print_status "After DNS propagation (5-30 minutes), your app URLs will be:"
-        echo "  • App subdomains: http://myapp123.$domain"
-        echo "  • Another app: http://blog456.$domain"
-        echo "  • Random app: http://x7k9m2.$domain"
+        echo "  • App subdomains: http://myapp-12345.$domain"
+        echo "  • Another app: http://blog-67890.$domain"
+        echo "  • Random app: http://x7k9m2-54321.$domain"
         echo ""
         print_status "SSL Configuration:"
         echo "  • ❌ SSL certificate setup failed"
