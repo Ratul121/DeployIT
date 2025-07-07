@@ -161,6 +161,26 @@ class DeploymentService {
       // Update latest commit information before deployment
       await this.updateLatestCommit(app, userId, accessToken);
       
+      // Generate subdomain ONLY if app doesn't have one and BASE_DOMAIN is configured
+      // This preserves existing subdomains on redeployment
+      if (!app.subdomain && process.env.BASE_DOMAIN) {
+        try {
+          const subdomainService = require('./subdomain');
+          const subdomainResult = await subdomainService.reserveSubdomain(app.name, userId);
+          app.subdomain = subdomainResult.subdomain;
+          await app.save();
+          console.log(`Generated NEW subdomain for app "${app.name}": ${app.subdomain}`);
+          await this.addDeploymentLog(deployment, 'info', `Generated new subdomain: ${app.subdomain}`);
+        } catch (error) {
+          console.error('Error generating subdomain during deployment:', error);
+          await this.addDeploymentLog(deployment, 'warn', 'Failed to generate subdomain, using port-based URL');
+          // Continue deployment without subdomain
+        }
+      } else if (app.subdomain) {
+        console.log(`Using existing subdomain for app "${app.name}": ${app.subdomain}`);
+        await this.addDeploymentLog(deployment, 'info', `Using existing subdomain: ${app.subdomain}`);
+      }
+      
       // Emit deployment started
       socketService.emitDeploymentStatus(appId, 'building');
       await this.addDeploymentLog(deployment, 'info', 'Deployment started');
