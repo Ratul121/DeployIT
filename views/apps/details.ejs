@@ -748,16 +748,17 @@
                 const prevBtn = document.getElementById('prevPageBtn');
                 const nextBtn = document.getElementById('nextPageBtn');
                 
-                if (response.status === 429) {
-                    // Rate limited - show message and stop auto-refresh temporarily
-                    logsContainer.innerHTML = '<div class="text-yellow-600 text-sm">Rate limited - please wait before refreshing logs again.</div>';
-                    logStatus.innerHTML = 'Rate limited - reducing refresh frequency';
-                    
-                    // Stop auto-refresh temporarily
-                    stopLogRefresh();
-                    setTimeout(startLogRefresh, 30000); // Resume after 30 seconds
-                    return;
-                }
+                // Rate limiting handling removed
+                // if (response.status === 429) {
+                //     // Rate limited - show message and stop auto-refresh temporarily
+                //     logsContainer.innerHTML = '<div class="text-yellow-600 text-sm">Rate limited - please wait before refreshing logs again.</div>';
+                //     logStatus.innerHTML = 'Rate limited - reducing refresh frequency';
+                //     
+                //     // Stop auto-refresh temporarily
+                //     stopLogRefresh();
+                //     setTimeout(startLogRefresh, 30000); // Resume after 30 seconds
+                //     return;
+                // }
                 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -811,10 +812,8 @@
                     document.getElementById('logsContainer').innerHTML = `<div class="text-red-400 text-sm">Error loading logs: ${error.message}</div>`;
                 }
                 
-                // Don't show notification for rate limiting
-                if (!error.message.includes('429')) {
-                    showNotification('Failed to load application logs: ' + error.message, 'error');
-                }
+                // Show notification for all errors (rate limiting removed)
+                showNotification('Failed to load application logs: ' + error.message, 'error');
             }
         }
         
@@ -829,7 +828,7 @@
             loadAppLogs(currentPage + 1);
         }
 
-        // Auto-refresh logs every 10 seconds if app is running (reduced frequency to avoid rate limiting)
+        // Auto-refresh logs every 5 seconds if app is running (rate limiting removed)
         let logRefreshInterval = null;
         
         function startLogRefresh() {
@@ -839,7 +838,7 @@
             
             const isRunning = '<%= app.deployment.status %>' === 'running';
             if (isRunning) {
-                logRefreshInterval = setInterval(loadAppLogs, 10000); // 10 seconds instead of 5
+                logRefreshInterval = setInterval(loadAppLogs, 3000); // 3 seconds (rate limiting removed)
             }
         }
 

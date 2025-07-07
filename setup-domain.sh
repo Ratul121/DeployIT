@@ -93,8 +93,8 @@ create_nginx_config_with_ssl() {
 # This config handles app subdomains with wildcard SSL
 # Main domain SSL is handled separately
 
-# Rate limiting zone for app subdomains
-limit_req_zone \$binary_remote_addr zone=app_limit:10m rate=10r/s;
+# Rate limiting zone for app subdomains - REMOVED
+# limit_req_zone \$binary_remote_addr zone=app_limit:10m rate=10r/s;
 
 # HTTP server - redirect to HTTPS for app subdomains only
 server {
@@ -141,8 +141,8 @@ server {
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 10m;
     
-    # Rate limiting for app requests
-    limit_req zone=app_limit burst=20 nodelay;
+    # Rate limiting for app requests - REMOVED
+    # limit_req zone=app_limit burst=20 nodelay;
     
     # Security headers
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -254,16 +254,16 @@ create_nginx_config_http_only() {
 # This config handles app subdomains with HTTP only (SSL failed)
 # Main domain SSL is handled separately
 
-# Rate limiting zone for app subdomains
-limit_req_zone \$binary_remote_addr zone=app_limit:10m rate=10r/s;
+# Rate limiting zone for app subdomains - REMOVED
+# limit_req_zone \$binary_remote_addr zone=app_limit:10m rate=10r/s;
 
 # HTTP server for app subdomains
 server {
     listen 80;
     server_name *.$domain;
     
-    # Rate limiting for app requests
-    limit_req zone=app_limit burst=20 nodelay;
+    # Rate limiting for app requests - REMOVED
+    # limit_req zone=app_limit burst=20 nodelay;
     
     # Security headers
     add_header X-Frame-Options "SAMEORIGIN" always;

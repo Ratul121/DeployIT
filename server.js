@@ -3,7 +3,7 @@ const session = require('express-session');
 const passport = require('passport');
 const path = require('path');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+// const rateLimit = require('express-rate-limit'); // REMOVED: Rate limiting disabled
 const cors = require('cors');
 const morgan = require('morgan');
 const compression = require('compression');
@@ -46,7 +46,6 @@ const server = http.createServer(app);
 const io = socketIo(server);
 
 // Trust proxy - required when behind reverse proxy (Nginx, Cloudflare, etc.)
-// This fixes the X-Forwarded-For header issue with rate limiting
 app.set('trust proxy', true);
 
 // Connect to database
@@ -67,13 +66,13 @@ app.use(helmet({
   }
 }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
-  message: 'Too many requests from this IP, please try again later.'
-});
-app.use(limiter);
+// Rate limiting - REMOVED
+// const limiter = rateLimit({
+//   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+//   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+//   message: 'Too many requests from this IP, please try again later.'
+// });
+// app.use(limiter); // REMOVED: Rate limiting disabled
 
 // General middleware
 app.use(cors());

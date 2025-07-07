@@ -7,10 +7,10 @@ const githubService = require('../services/github');
 const logManager = require('../services/logManager');
 const router = express.Router();
 
-// Simple rate limiting for logs endpoint
-const logRequestTimes = new Map();
-const RATE_LIMIT_WINDOW = 5000; // 5 seconds
-const MAX_REQUESTS_PER_WINDOW = 3;
+// Simple rate limiting for logs endpoint - REMOVED
+// const logRequestTimes = new Map();
+// const RATE_LIMIT_WINDOW = 5000; // 5 seconds
+// const MAX_REQUESTS_PER_WINDOW = 3;
 
 // Get all apps for user
 router.get('/', async (req, res) => {
@@ -297,25 +297,25 @@ router.delete('/:id', async (req, res) => {
 // Get app logs
 router.get('/:id/logs', async (req, res) => {
   try {
-    // Rate limiting
-    const userId = req.user._id.toString();
-    const now = Date.now();
-    
-    if (!logRequestTimes.has(userId)) {
-      logRequestTimes.set(userId, []);
-    }
-    
-    const userRequests = logRequestTimes.get(userId);
-    // Remove old requests outside the window
-    const recentRequests = userRequests.filter(time => now - time < RATE_LIMIT_WINDOW);
-    
-    if (recentRequests.length >= MAX_REQUESTS_PER_WINDOW) {
-      return res.status(429).json({ error: 'Too many requests. Please wait before fetching logs again.' });
-    }
-    
-    // Add current request
-    recentRequests.push(now);
-    logRequestTimes.set(userId, recentRequests);
+    // Rate limiting - REMOVED
+    // const userId = req.user._id.toString();
+    // const now = Date.now();
+    // 
+    // if (!logRequestTimes.has(userId)) {
+    //   logRequestTimes.set(userId, []);
+    // }
+    // 
+    // const userRequests = logRequestTimes.get(userId);
+    // // Remove old requests outside the window
+    // const recentRequests = userRequests.filter(time => now - time < RATE_LIMIT_WINDOW);
+    // 
+    // if (recentRequests.length >= MAX_REQUESTS_PER_WINDOW) {
+    //   return res.status(429).json({ error: 'Too many requests. Please wait before fetching logs again.' });
+    // }
+    // 
+    // // Add current request
+    // recentRequests.push(now);
+    // logRequestTimes.set(userId, recentRequests);
     
     const app = await App.findOne({ 
       _id: req.params.id, 
