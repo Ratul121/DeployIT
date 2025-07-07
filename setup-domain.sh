@@ -112,8 +112,13 @@ server {
             set \$subdomain \$1;
         }
         
-        # Only redirect app subdomains (not main domain or deployit subdomain)
-        if (\$subdomain != "" && \$subdomain != "deployit") {
+        # Block deployit subdomain from redirect
+        if (\$subdomain = "deployit") {
+            return 404;
+        }
+        
+        # Redirect all other subdomains to HTTPS
+        if (\$subdomain != "") {
             return 301 https://\$host\$request_uri;
         }
         
@@ -667,7 +672,7 @@ class SubdomainService {
     // If all attempts failed, use timestamp-based fallback with 5-digit number
     const timestamp = Date.now().toString().slice(-4);
     const random5Digits = Math.floor(Math.random() * 90000) + 10000;
-    return \`app\${timestamp}-\${random5Digits}\`;
+    return 'app' + timestamp + '-' + random5Digits;
   }
 
   // Generate full URL from subdomain (with SSL support)
@@ -680,7 +685,7 @@ class SubdomainService {
       throw new Error('BASE_DOMAIN environment variable not set');
     }
     
-    return \`\${protocol}://\${subdomain}.\${baseDomain}\`;
+    return protocol + '://' + subdomain + '.' + baseDomain;
   }
 
   // Validate subdomain format for apps
