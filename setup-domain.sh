@@ -93,9 +93,6 @@ create_nginx_config_with_ssl() {
 # This config handles app subdomains with wildcard SSL
 # Main domain SSL is handled separately
 
-# Rate limiting zone for app subdomains
-limit_req_zone \$binary_remote_addr zone=app_limit:10m rate=10r/s;
-
 # HTTP server - redirect to HTTPS for app subdomains only
 server {
     listen 80;
@@ -115,8 +112,8 @@ server {
             set \$subdomain \$1;
         }
         
-        # Only redirect app subdomains (not main domain)
-        if (\$subdomain != "") {
+        # Only redirect app subdomains (not main domain or deployit subdomain)
+        if (\$subdomain != "" && \$subdomain != "deployit") {
             return 301 https://\$host\$request_uri;
         }
         
@@ -125,7 +122,7 @@ server {
     }
 }
 
-    # HTTPS server for app subdomains
+# HTTPS server for app subdomains
 server {
     listen 443 ssl http2;
     server_name *.$domain;
@@ -141,9 +138,6 @@ server {
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 10m;
     
-    # Rate limiting for app requests
-    limit_req zone=app_limit burst=20 nodelay;
-    
     # Security headers
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-XSS-Protection "1; mode=block" always;
@@ -157,8 +151,8 @@ server {
             set \$subdomain \$1;
         }
         
-        # Block reserved/system subdomains
-        if (\$subdomain ~* "^(www|mail|ftp|ssh|admin|api|staging|dev|test|blog|shop|store|app|portal|dashboard|control|manage|system|root|secure|ssl|cdn|static|assets|media|files|docs|support|help|status|monitor|health)\$") {
+        # Block reserved/system subdomains and exclude main app subdomain
+        if (\$subdomain ~* "^(www|mail|ftp|ssh|admin|api|staging|dev|test|blog|shop|store|app|portal|dashboard|control|manage|system|root|secure|ssl|cdn|static|assets|media|files|docs|support|help|status|monitor|health|deployit)\$") {
             return 403 "Reserved subdomain - cannot be used for apps";
         }
         
@@ -254,16 +248,10 @@ create_nginx_config_http_only() {
 # This config handles app subdomains with HTTP only (SSL failed)
 # Main domain SSL is handled separately
 
-# Rate limiting zone for app subdomains
-limit_req_zone \$binary_remote_addr zone=app_limit:10m rate=10r/s;
-
 # HTTP server for app subdomains
 server {
     listen 80;
     server_name *.$domain;
-    
-    # Rate limiting for app requests
-    limit_req zone=app_limit burst=20 nodelay;
     
     # Security headers
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -277,8 +265,8 @@ server {
             set \$subdomain \$1;
         }
         
-        # Block reserved/system subdomains
-        if (\$subdomain ~* "^(www|mail|ftp|ssh|admin|api|staging|dev|test|blog|shop|store|app|portal|dashboard|control|manage|system|root|secure|ssl|cdn|static|assets|media|files|docs|support|help|status|monitor|health)\$") {
+        # Block reserved/system subdomains and exclude main app subdomain
+        if (\$subdomain ~* "^(www|mail|ftp|ssh|admin|api|staging|dev|test|blog|shop|store|app|portal|dashboard|control|manage|system|root|secure|ssl|cdn|static|assets|media|files|docs|support|help|status|monitor|health|deployit)\$") {
             return 403 "Reserved subdomain - cannot be used for apps";
         }
         
@@ -580,7 +568,7 @@ class SubdomainService {
       'www', 'mail', 'ftp', 'ssh', 'admin', 'api', 'staging', 'dev', 'test',
       'blog', 'shop', 'store', 'app', 'portal', 'dashboard', 'control', 'manage',
       'system', 'root', 'secure', 'ssl', 'cdn', 'static', 'assets', 'media',
-      'files', 'docs', 'support', 'help', 'status', 'monitor', 'health'
+      'files', 'docs', 'support', 'help', 'status', 'monitor', 'health', 'deployit'
     ];
   }
 
